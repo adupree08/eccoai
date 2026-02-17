@@ -28,3 +28,4 @@ export function createClient() {
 
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
+// Schema refresh trigger Tue Feb 17 13:36:17 CST 2026
