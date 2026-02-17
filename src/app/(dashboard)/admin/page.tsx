@@ -101,7 +101,7 @@ export default function AdminPage() {
         .select("user_id")
         .gte("created_at", weekAgo.toISOString());
 
-      const activeUserIds = new Set(activePosts?.map(p => p.user_id) || []);
+      const activeUserIds = new Set(activePosts?.map((p: { user_id: string }) => p.user_id) || []);
 
       // Fetch user profiles
       const { data: profiles } = await supabase
@@ -126,24 +126,24 @@ export default function AdminPage() {
 
       // Count posts per user
       const postsPerUser: Record<string, number> = {};
-      userPosts?.forEach(p => {
+      userPosts?.forEach((p: { user_id: string }) => {
         postsPerUser[p.user_id] = (postsPerUser[p.user_id] || 0) + 1;
       });
 
       // Count feeds per user
       const feedsPerUser: Record<string, number> = {};
-      userFeeds?.forEach(f => {
+      userFeeds?.forEach((f: { user_id: string }) => {
         feedsPerUser[f.user_id] = (feedsPerUser[f.user_id] || 0) + 1;
       });
 
       // Count brand voices per user
       const voicesPerUser: Record<string, number> = {};
-      userVoices?.forEach(v => {
+      userVoices?.forEach((v: { user_id: string }) => {
         voicesPerUser[v.user_id] = (voicesPerUser[v.user_id] || 0) + 1;
       });
 
       // Build user stats
-      const userStats: UserStats[] = (profiles || []).map(profile => ({
+      const userStats: UserStats[] = (profiles || []).map((profile: { id: string; email: string | null; created_at: string; updated_at: string | null }) => ({
         id: profile.id,
         email: profile.email || "Unknown",
         created_at: profile.created_at,
