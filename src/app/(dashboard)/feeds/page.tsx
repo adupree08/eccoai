@@ -321,27 +321,38 @@ export default function FeedsPage() {
             </div>
 
             {newFeedType === "url" ? (
-              <div className="flex items-center gap-4">
-                <Input
-                  placeholder="Enter RSS feed URL..."
-                  value={newFeedUrl}
-                  onChange={(e) => setNewFeedUrl(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleAddFeed}
-                  className="bg-ecco-navy hover:bg-ecco-navy-light"
-                  disabled={addingFeedLoading || !newFeedUrl.trim()}
-                >
-                  {addingFeedLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Add"
-                  )}
-                </Button>
-                <Button variant="ghost" onClick={() => setIsAddingFeed(false)} disabled={addingFeedLoading}>
-                  Cancel
-                </Button>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <Input
+                    placeholder="Enter RSS feed URL..."
+                    value={newFeedUrl}
+                    onChange={(e) => setNewFeedUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleAddFeed}
+                    className="bg-ecco-navy hover:bg-ecco-navy-light"
+                    disabled={addingFeedLoading || !newFeedUrl.trim()}
+                  >
+                    {addingFeedLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setIsAddingFeed(false)} disabled={addingFeedLoading}>
+                    Cancel
+                  </Button>
+                </div>
+                <div className="p-3 bg-ecco-off-white rounded-lg">
+                  <p className="text-xs font-medium text-ecco-secondary mb-1.5">How to find RSS feeds:</p>
+                  <ul className="text-xs text-ecco-tertiary space-y-1 list-disc list-inside">
+                    <li>Look for an RSS/Feed icon on websites you follow</li>
+                    <li>Try adding <code className="bg-white px-1 rounded">/feed</code> or <code className="bg-white px-1 rounded">/rss</code> to blog URLs</li>
+                    <li>Check the website footer for &quot;RSS&quot; or &quot;Subscribe&quot; links</li>
+                    <li>Popular sources: Medium blogs, Substack newsletters, news sites, company blogs</li>
+                  </ul>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">

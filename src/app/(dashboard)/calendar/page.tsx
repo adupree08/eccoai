@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { usePosts } from "@/hooks/use-posts";
 import {
   DndContext,
   DragEndEvent,
@@ -22,8 +23,11 @@ import {
   Copy,
   X,
   Check,
+  Loader2,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 interface ScheduledPost {
   id: string;
@@ -32,37 +36,9 @@ interface ScheduledPost {
   time: string;
 }
 
-// Mock data
-const initialScheduledPosts: ScheduledPost[] = [
-  {
-    id: "1",
-    content: "The best advice I ever received wasn't about working harder. It was about working smarter. Here's what changed everything for me:\n\n1. Focus on one thing at a time\n2. Take regular breaks to recharge\n3. Learn to say no to distractions\n4. Document your processes\n5. Automate repetitive tasks\n\nThe result? I got more done in 4 hours than I used to in 8.",
-    date: new Date(2025, 1, 18),
-    time: "9:00 AM",
-  },
-  {
-    id: "2",
-    content: "5 leadership lessons from my first year as a founder:\n\n1. Listen more than you speak\n2. Hire for culture fit, train for skills\n3. Celebrate small wins\n4. Be transparent with your team\n5. Take care of yourself first",
-    date: new Date(2025, 1, 20),
-    time: "12:00 PM",
-  },
-  {
-    id: "3",
-    content: "Stop trying to be productive 24/7.\n\nI know, it sounds counterintuitive.\n\nBut here's the truth: Your brain needs rest to perform at its best.",
-    date: new Date(2025, 1, 22),
-    time: "8:30 AM",
-  },
-  {
-    id: "4",
-    content: "The future of remote work isn't about choosing between office or home. It's about flexibility. The companies winning the talent war understand this.",
-    date: new Date(2025, 1, 25),
-    time: "10:00 AM",
-  },
-];
-
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Draggable Post Component - only drag when actually dragging, click expands
+// Draggable Post Component
 function DraggablePost({
   post,
   isExpanded,
@@ -102,13 +78,11 @@ function DraggablePost({
 
   return (
     <div className="space-y-2">
-      {/* Collapsed view - draggable handle */}
       <div
         ref={setNodeRef}
         {...listeners}
         {...attributes}
         onClick={(e) => {
-          // Only toggle if not dragging
           if (!isDragging) {
             e.stopPropagation();
             onToggleExpand();
@@ -122,7 +96,6 @@ function DraggablePost({
         {post.content.slice(0, 30)}...
       </div>
 
-      {/* Expanded view - shows below when clicked */}
       {isExpanded && (
         <div
           className="p-3 bg-white border border-ecco rounded-lg shadow-lg text-xs"
@@ -184,7 +157,6 @@ function DroppableDay({
   onCopy: (content: string, id: string) => void;
   copiedId: string | null;
 }) {
-  // Use local date components to create key (avoiding timezone issues)
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -236,24 +208,41 @@ function DroppableDay({
 }
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 1)); // February 2025
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>(initialScheduledPosts);
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Configure sensors to require some movement before starting drag
+  const { posts, loading, updatePost } = usePosts();
+
+  // Convert scheduled posts from database to calendar format
+  const scheduledPosts: ScheduledPost[] = useMemo(() => {
+    return posts
+      .filter((p) => p.status === "scheduled" && p.scheduled_at)
+      .map((p) => {
+        const scheduledDate = new Date(p.scheduled_at!);
+        return {
+          id: p.id,
+          content: p.content,
+          date: scheduledDate,
+          time: scheduledDate.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+        };
+      });
+  }, [posts]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // 8px of movement required before drag starts
+        distance: 8,
       },
     })
   );
 
   const today = new Date();
 
-  // Generate calendar days
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -302,10 +291,10 @@ export default function CalendarPage() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
-    setExpandedPostId(null); // Close any expanded post when dragging
+    setExpandedPostId(null);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
@@ -316,16 +305,17 @@ export default function CalendarPage() {
 
     if (!dropData) return;
 
-    // Update the post's date using the explicit date components
-    setScheduledPosts((posts) =>
-      posts.map((post) => {
-        if (post.id === postId) {
-          const newDate = new Date(dropData.year, dropData.month, dropData.day);
-          return { ...post, date: newDate };
-        }
-        return post;
-      })
-    );
+    // Find the original post to get its time
+    const originalPost = scheduledPosts.find((p) => p.id === postId);
+    if (!originalPost) return;
+
+    // Create new date with the same time
+    const newDate = new Date(dropData.year, dropData.month, dropData.day);
+    newDate.setHours(originalPost.date.getHours());
+    newDate.setMinutes(originalPost.date.getMinutes());
+
+    // Update in database
+    await updatePost(postId, { scheduled_at: newDate.toISOString() });
   };
 
   const handleToggleExpand = (postId: string) => {
@@ -339,6 +329,26 @@ export default function CalendarPage() {
   };
 
   const activePost = activeId ? scheduledPosts.find((p) => p.id === activeId) : null;
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-ecco-primary">
+              Calendar
+            </h1>
+            <p className="text-sm text-ecco-tertiary">
+              View and manage your scheduled posts
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DndContext
@@ -355,13 +365,15 @@ export default function CalendarPage() {
               Calendar
             </h1>
             <p className="text-sm text-ecco-tertiary">
-              Click posts to expand • Drag to reschedule
+              Click posts to expand - Drag to reschedule
             </p>
           </div>
-          <Button className="bg-ecco-navy hover:bg-ecco-navy-light">
-            <Plus className="mr-2 h-4 w-4" />
-            Schedule Post
-          </Button>
+          <Link href="/create">
+            <Button className="bg-ecco-navy hover:bg-ecco-navy-light">
+              <Plus className="mr-2 h-4 w-4" />
+              Schedule Post
+            </Button>
+          </Link>
         </div>
 
         {/* Calendar Navigation */}
@@ -441,48 +453,67 @@ export default function CalendarPage() {
             <h3 className="text-base font-semibold text-ecco-primary mb-4">
               Upcoming Posts
             </h3>
-            <div className="space-y-3">
-              {scheduledPosts
-                .sort((a, b) => a.date.getTime() - b.date.getTime())
-                .slice(0, 5)
-                .map((post) => (
-                  <div
-                    key={post.id}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-ecco-off-white cursor-pointer hover:bg-ecco-accent-light transition-colors"
-                    onClick={() => handleToggleExpand(post.id)}
-                  >
-                    <div className="flex flex-col items-center text-center min-w-[50px]">
-                      <span className="text-lg font-bold text-ecco-primary">
-                        {post.date.getDate()}
-                      </span>
-                      <span className="text-[10px] uppercase text-ecco-tertiary">
-                        {post.date.toLocaleDateString("en-US", { month: "short" })}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-ecco-primary truncate">
-                        {post.content}
-                      </p>
-                      <p className="text-xs text-ecco-tertiary">{post.time}</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopy(post.content, post.id);
-                      }}
+            {scheduledPosts.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ecco-accent-light mx-auto">
+                  <CalendarDays className="h-6 w-6 text-ecco-accent" />
+                </div>
+                <h4 className="text-sm font-medium text-ecco-primary mb-1">
+                  No scheduled posts yet
+                </h4>
+                <p className="text-xs text-ecco-tertiary mb-4">
+                  Schedule posts from your library or create new ones
+                </p>
+                <Link href="/library">
+                  <Button variant="outline" size="sm">
+                    Go to Library
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {scheduledPosts
+                  .sort((a, b) => a.date.getTime() - b.date.getTime())
+                  .slice(0, 5)
+                  .map((post) => (
+                    <div
+                      key={post.id}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-ecco-off-white cursor-pointer hover:bg-ecco-accent-light transition-colors"
+                      onClick={() => handleToggleExpand(post.id)}
                     >
-                      {copiedId === post.id ? (
-                        <Check className="h-4 w-4 text-ecco-success" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                ))}
-            </div>
+                      <div className="flex flex-col items-center text-center min-w-[50px]">
+                        <span className="text-lg font-bold text-ecco-primary">
+                          {post.date.getDate()}
+                        </span>
+                        <span className="text-[10px] uppercase text-ecco-tertiary">
+                          {post.date.toLocaleDateString("en-US", { month: "short" })}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-ecco-primary truncate">
+                          {post.content}
+                        </p>
+                        <p className="text-xs text-ecco-tertiary">{post.time}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(post.content, post.id);
+                        }}
+                      >
+                        {copiedId === post.id ? (
+                          <Check className="h-4 w-4 text-ecco-success" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
