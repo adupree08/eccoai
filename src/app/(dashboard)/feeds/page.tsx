@@ -119,23 +119,30 @@ export default function FeedsPage() {
 
     setAddingFeedLoading(true);
 
-    // Create the feed first
+    // For keyword feeds, generate a Google News RSS URL
+    // This works around the Supabase schema cache issue by using the existing url field
+    let feedUrl = newFeedUrl.trim();
+    let feedName = newFeedName.trim();
+
+    if (newFeedType === "keyword") {
+      const keywords = newFeedKeywords.trim();
+      feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(keywords)}&hl=en-US&gl=US&ceid=US:en`;
+      feedName = feedName || `Keywords: ${keywords}`;
+    } else {
+      feedName = feedName || "New Feed";
+    }
+
+    // Create the feed - only use fields that exist in the schema
+    // The feed_type and keywords columns may not be in the schema cache yet
     const feedData: {
       name: string;
       url: string;
-      feed_type: "url" | "keyword";
-      keywords?: string;
       is_active: boolean;
     } = {
-      name: newFeedName.trim() || (newFeedType === "url" ? "New Feed" : newFeedKeywords.trim()),
-      url: newFeedType === "url" ? newFeedUrl.trim() : "",
-      feed_type: newFeedType,
+      name: feedName,
+      url: feedUrl,
       is_active: true,
     };
-
-    if (newFeedType === "keyword") {
-      feedData.keywords = newFeedKeywords.trim();
-    }
 
     const result = await createFeed(feedData);
 
@@ -162,13 +169,9 @@ export default function FeedsPage() {
     setRefreshingFeeds(prev => new Set(prev).add(feedId));
 
     try {
-      // Find the feed to determine its type
-      const feed = feeds.find(f => f.id === feedId);
-      const endpoint = feed?.feed_type === "keyword"
-        ? "/api/feeds/search-keywords"
-        : "/api/feeds/refresh";
-
-      const response = await fetch(endpoint, {
+      // All feeds now use the standard RSS refresh endpoint
+      // Keyword feeds store a Google News RSS URL which works with the standard refresh
+      const response = await fetch("/api/feeds/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedId }),
@@ -463,7 +466,7 @@ export default function FeedsPage() {
                       {articleCounts[feed.id] || 0} articles
                     </Badge>
                     <Badge variant="outline" className="text-xs">
-                      {feed.feed_type === "keyword" ? (
+                      {feed.url?.includes("news.google.com/rss/search") ? (
                         <><Search className="h-3 w-3 mr-1" />Keywords</>
                       ) : (
                         <><Link2 className="h-3 w-3 mr-1" />URL</>
@@ -471,7 +474,9 @@ export default function FeedsPage() {
                     </Badge>
                   </div>
                   <p className="text-xs text-ecco-tertiary truncate">
-                    {feed.feed_type === "keyword" ? `Keywords: ${feed.keywords}` : feed.url}
+                    {feed.url?.includes("news.google.com/rss/search")
+                      ? `Keywords: ${decodeURIComponent(new URL(feed.url).searchParams.get("q") || "")}`
+                      : feed.url}
                   </p>
                   <p className="text-xs text-ecco-muted mt-0.5">
                     Last fetched: {formatLastFetched(feed.last_fetched_at)}
