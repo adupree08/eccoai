@@ -119,6 +119,9 @@ export function Sidebar() {
   // Check if user is admin
   const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
+  // Debug logging
+  console.log("Sidebar user email:", user?.email, "isAdmin:", isAdmin);
+
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-border bg-white">
       <div className="flex h-full flex-col">
