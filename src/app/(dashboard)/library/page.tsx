@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, Suspense, useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search,
   Filter,
-  MoreVertical,
   Calendar,
   Copy,
   Trash2,
@@ -19,65 +19,18 @@ import {
   X,
   Check,
   Sparkles,
-  Send,
+  Loader2,
+  FileText,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-interface Post {
-  id: string;
-  content: string;
-  status: "draft" | "scheduled" | "published";
-  createdAt: string;
-  scheduledFor?: string;
-  publishedAt?: string;
-  impressions?: number;
-  engagements?: number;
-}
-
-// Mock data (will come from Supabase later)
-const mockPosts: Post[] = [
-  {
-    id: "1",
-    content: "The best advice I ever received wasn't about working harder.\n\nIt was about working smarter.\n\nHere's what changed everything for me:\n\n1. Focus on one thing at a time\n2. Take regular breaks to recharge\n3. Learn to say no to distractions\n4. Document your processes\n5. Automate repetitive tasks\n\nThe result? I got more done in 4 hours than I used to in 8.",
-    status: "draft",
-    createdAt: "2 hours ago",
-  },
-  {
-    id: "2",
-    content: "Stop trying to be productive 24/7.\n\nI know, it sounds counterintuitive.\n\nBut here's the truth:\n\nYour brain needs rest to perform at its best.",
-    status: "scheduled",
-    createdAt: "Yesterday",
-    scheduledFor: "Feb 20, 2025 at 9:00 AM",
-  },
-  {
-    id: "3",
-    content: "5 leadership lessons I learned from my first year as a founder:\n\n1. Listen more than you speak\n2. Hire for culture fit, train for skills\n3. Celebrate small wins\n4. Be transparent with your team\n5. Take care of yourself first",
-    status: "published",
-    createdAt: "1 week ago",
-    publishedAt: "Feb 10, 2025",
-    impressions: 4832,
-    engagements: 156,
-  },
-  {
-    id: "4",
-    content: "The future of remote work isn't about choosing between office or home.\n\nIt's about flexibility.\n\nThe companies winning the talent war understand this.",
-    status: "published",
-    createdAt: "2 weeks ago",
-    publishedAt: "Feb 3, 2025",
-    impressions: 3241,
-    engagements: 89,
-  },
-  {
-    id: "5",
-    content: "Why I stopped chasing viral content and focused on building genuine connections instead.\n\nThe results surprised me:\n\n• More meaningful conversations\n• Better quality leads\n• Stronger network\n\nVanity metrics matter less than real impact.",
-    status: "draft",
-    createdAt: "3 days ago",
-  },
-];
+import { cn, formatDistanceToNow } from "@/lib/utils";
+import { usePosts } from "@/hooks/use-posts";
 
 function LibraryContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialFilter = searchParams.get("filter") || "all";
+
+  const { posts, loading, updatePost, deletePost, schedulePost } = usePosts();
 
   const [activeFilter, setActiveFilter] = useState(initialFilter);
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,30 +38,31 @@ function LibraryContent() {
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
-  const getFilteredPosts = () => {
-    let posts = mockPosts;
+  const filteredPosts = useMemo(() => {
+    let result = posts;
 
     // Filter by status
     if (activeFilter === "drafts") {
-      posts = posts.filter((p) => p.status === "draft");
+      result = result.filter((p) => p.status === "draft");
     } else if (activeFilter === "scheduled") {
-      posts = posts.filter((p) => p.status === "scheduled");
+      result = result.filter((p) => p.status === "scheduled");
     } else if (activeFilter === "published") {
-      posts = posts.filter((p) => p.status === "published");
+      result = result.filter((p) => p.status === "published");
     }
 
     // Filter by search
     if (searchQuery) {
-      posts = posts.filter((p) =>
+      result = result.filter((p) =>
         p.content.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    return posts;
-  };
-
-  const filteredPosts = getFilteredPosts();
+    return result;
+  }, [posts, activeFilter, searchQuery]);
 
   const toggleSelectPost = (postId: string) => {
     const newSelected = new Set(selectedPosts);
@@ -128,7 +82,7 @@ function LibraryContent() {
     }
   };
 
-  const getStatusBadge = (status: Post["status"]) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "draft":
         return (
@@ -148,20 +102,111 @@ function LibraryContent() {
             Published
           </Badge>
         );
+      default:
+        return null;
     }
   };
 
-  const handleEdit = (post: Post) => {
+  const handleEdit = (post: { id: string; content: string }) => {
     setEditingPostId(post.id);
     setEditContent(post.content);
     setExpandedPostId(post.id);
   };
 
-  const handleSaveEdit = () => {
-    // In real app, update in Supabase
-    setEditingPostId(null);
-    setEditContent("");
+  const handleSaveEdit = async () => {
+    if (!editingPostId) return;
+
+    setSavingPostId(editingPostId);
+    try {
+      await updatePost(editingPostId, { content: editContent });
+      setEditingPostId(null);
+      setEditContent("");
+    } catch {
+      alert("Failed to save changes");
+    } finally {
+      setSavingPostId(null);
+    }
   };
+
+  const handleCopy = (content: string, id: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+
+    setDeletingPostId(postId);
+    try {
+      await deletePost(postId);
+      setExpandedPostId(null);
+    } catch {
+      alert("Failed to delete post");
+    } finally {
+      setDeletingPostId(null);
+    }
+  };
+
+  const handleSchedule = async (postId: string) => {
+    setSavingPostId(postId);
+    try {
+      const scheduledAt = new Date();
+      scheduledAt.setDate(scheduledAt.getDate() + 1);
+      scheduledAt.setHours(9, 0, 0, 0);
+
+      await schedulePost(postId, scheduledAt);
+    } catch {
+      alert("Failed to schedule post");
+    } finally {
+      setSavingPostId(null);
+    }
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    try {
+      return formatDistanceToNow(new Date(dateString));
+    } catch {
+      return "";
+    }
+  };
+
+  const formatScheduledDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-ecco-primary">
+              Library
+            </h1>
+            <p className="text-sm text-ecco-tertiary">
+              All your saved posts in one place
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -202,25 +247,25 @@ function LibraryContent() {
               value="all"
               className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
             >
-              All Posts
+              All Posts ({posts.length})
             </TabsTrigger>
             <TabsTrigger
               value="drafts"
               className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
             >
-              Drafts
+              Drafts ({posts.filter(p => p.status === "draft").length})
             </TabsTrigger>
             <TabsTrigger
               value="scheduled"
               className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
             >
-              Scheduled
+              Scheduled ({posts.filter(p => p.status === "scheduled").length})
             </TabsTrigger>
             <TabsTrigger
               value="published"
               className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
             >
-              Published
+              Published ({posts.filter(p => p.status === "published").length})
             </TabsTrigger>
           </TabsList>
         </div>
@@ -307,9 +352,14 @@ function LibraryContent() {
                         <Button
                           size="sm"
                           onClick={handleSaveEdit}
+                          disabled={savingPostId === post.id}
                           className="bg-ecco-navy hover:bg-ecco-navy-light"
                         >
-                          <Check className="mr-1.5 h-3.5 w-3.5" />
+                          {savingPostId === post.id ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="mr-1.5 h-3.5 w-3.5" />
+                          )}
                           Save
                         </Button>
                       </div>
@@ -336,19 +386,32 @@ function LibraryContent() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigator.clipboard.writeText(post.content);
+                            handleCopy(post.content, post.id);
                           }}
                         >
-                          <Copy className="mr-1.5 h-3.5 w-3.5" />
-                          Copy
+                          {copiedId === post.id ? (
+                            <Check className="mr-1.5 h-3.5 w-3.5 text-ecco-success" />
+                          ) : (
+                            <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          {copiedId === post.id ? "Copied" : "Copy"}
                         </Button>
                         {post.status === "draft" && (
                           <>
                             <Button
                               variant="secondary"
                               size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSchedule(post.id);
+                              }}
+                              disabled={savingPostId === post.id}
                             >
-                              <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                              {savingPostId === post.id ? (
+                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                              )}
                               Schedule
                             </Button>
                             <Button
@@ -360,6 +423,23 @@ function LibraryContent() {
                             </Button>
                           </>
                         )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(post.id);
+                          }}
+                          disabled={deletingPostId === post.id}
+                          className="text-ecco-error hover:text-ecco-error"
+                        >
+                          {deletingPostId === post.id ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Delete
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -386,16 +466,16 @@ function LibraryContent() {
                 {expandedPostId !== post.id && (
                   <div className="flex items-center justify-between pt-3 border-t border-ecco-light">
                     <span className="text-xs text-ecco-tertiary">
-                      {post.createdAt}
+                      {formatDate(post.created_at)}
                     </span>
                     {post.status === "published" && post.impressions && (
                       <span className="text-xs text-ecco-tertiary">
                         {post.impressions.toLocaleString()} views
                       </span>
                     )}
-                    {post.status === "scheduled" && post.scheduledFor && (
+                    {post.status === "scheduled" && post.scheduled_at && (
                       <span className="text-xs text-ecco-tertiary">
-                        {post.scheduledFor}
+                        {formatScheduledDate(post.scheduled_at)}
                       </span>
                     )}
                   </div>
@@ -407,9 +487,29 @@ function LibraryContent() {
 
         {/* Empty State */}
         {filteredPosts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-ecco-tertiary">No posts found</p>
-          </div>
+          <Card className="border-ecco border-dashed mt-6">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ecco-accent-light">
+                <FileText className="h-6 w-6 text-ecco-accent" />
+              </div>
+              <h3 className="text-base font-semibold text-ecco-primary">
+                {searchQuery ? "No posts found" : "No posts yet"}
+              </h3>
+              <p className="mt-1 text-sm text-ecco-tertiary text-center max-w-md">
+                {searchQuery
+                  ? "Try a different search term"
+                  : "Create your first post to see it here"}
+              </p>
+              {!searchQuery && (
+                <Link href="/create">
+                  <Button className="mt-4 bg-ecco-navy hover:bg-ecco-navy-light">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Create Post
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
         )}
       </Tabs>
     </div>

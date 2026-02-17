@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import {
   Lightbulb,
   Link2,
@@ -17,14 +16,15 @@ import {
   Edit3,
   Save,
   Calendar,
-  Send,
   RefreshCw,
-  Wand2,
-  MessageSquare,
   X,
   Check,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePosts } from "@/hooks/use-posts";
+import { useBrandVoices } from "@/hooks/use-brand-voices";
 
 const formats = [
   "None",
@@ -81,6 +81,8 @@ const lengths = [
 interface GeneratedPost {
   id: string;
   content: string;
+  hook: string;
+  approach: string;
   characterCount: number;
 }
 
@@ -95,77 +97,137 @@ const aiActions = [
 
 function CreatePostContent() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") || "idea";
+  const router = useRouter();
+  const { createPost } = usePosts();
+  const { brandVoices } = useBrandVoices();
+
+  // Initialize from URL params (for RSS source)
+  const sourceParam = searchParams.get("source");
+  const titleParam = searchParams.get("title");
+  const urlParam = searchParams.get("url");
+  const contentParam = searchParams.get("content");
+
+  const initialTab = sourceParam === "rss" ? "rss" : (searchParams.get("tab") || "idea");
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [ideaInput, setIdeaInput] = useState("");
-  const [urlInput, setUrlInput] = useState("");
+  const [urlInput, setUrlInput] = useState(urlParam || "");
+  const [rssContent, setRssContent] = useState({
+    title: titleParam || "",
+    url: urlParam || "",
+    content: contentParam || "",
+  });
   const [selectedTones, setSelectedTones] = useState<string[]>([]);
-  const [selectedFormat, setSelectedFormat] = useState<string>("None"); // Single select
+  const [selectedFormat, setSelectedFormat] = useState<string>("None");
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
   const [selectedLength, setSelectedLength] = useState("Medium");
+  const [selectedBrandVoice, setSelectedBrandVoice] = useState<string>("none");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
+  const [urlFetched, setUrlFetched] = useState<{ title: string; content: string } | null>(null);
   const [generatedPosts, setGeneratedPosts] = useState<GeneratedPost[]>([]);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [aiChatInput, setAiChatInput] = useState("");
 
-  const handleGenerate = () => {
+  // Auto-fetch URL content when coming from RSS
+  useEffect(() => {
+    if (sourceParam === "rss" && urlParam && contentParam) {
+      setUrlFetched({
+        title: titleParam || "",
+        content: contentParam,
+      });
+    }
+  }, [sourceParam, urlParam, contentParam, titleParam]);
+
+  const fetchUrlContent = async () => {
+    if (!urlInput.trim()) return;
+
+    setIsFetchingUrl(true);
+    try {
+      const response = await fetch("/api/fetch-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlInput }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUrlFetched({
+          title: data.title,
+          content: data.content,
+        });
+      } else {
+        alert("Failed to fetch URL: " + data.error);
+      }
+    } catch {
+      alert("Failed to fetch URL content");
+    } finally {
+      setIsFetchingUrl(false);
+    }
+  };
+
+  const handleGenerate = async () => {
     setIsGenerating(true);
 
-    // Simulate AI generation
-    setTimeout(() => {
-      const mockPosts: GeneratedPost[] = [
-        {
-          id: "1",
-          content: `The best advice I ever received wasn't about working harder.
+    try {
+      let sourceType = activeTab;
+      let content = "";
+      let url = "";
 
-It was about working smarter.
+      if (activeTab === "idea") {
+        sourceType = "idea";
+        content = ideaInput;
+      } else if (activeTab === "url") {
+        sourceType = "url";
+        url = urlInput;
+        content = urlFetched?.content || "";
+      } else if (activeTab === "rss") {
+        sourceType = "rss";
+        url = rssContent.url;
+        content = `Title: ${rssContent.title}\n\n${rssContent.content}`;
+      }
 
-Here's what changed everything for me:
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceType,
+          content,
+          url,
+          format: selectedFormat !== "None" ? selectedFormat : null,
+          tones: selectedTones.filter(t => t !== "None"),
+          angles: selectedAngles.filter(a => a !== "None"),
+          brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+          length: selectedLength,
+        }),
+      });
 
-1. Focus on one thing at a time
-2. Take regular breaks to recharge
-3. Learn to say no to distractions
-4. Document your processes
-5. Automate repetitive tasks
+      const data = await response.json();
 
-The result? I got more done in 4 hours than I used to in 8.
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate posts");
+      }
 
-What's the best productivity advice you've received?
+      const posts: GeneratedPost[] = (data.posts || []).map((post: { content: string; hook?: string; approach?: string }, index: number) => ({
+        id: `${Date.now()}-${index}`,
+        content: post.content,
+        hook: post.hook || "",
+        approach: post.approach || "",
+        characterCount: post.content.length,
+      }));
 
-Drop it in the comments. 👇`,
-          characterCount: 412,
-        },
-        {
-          id: "2",
-          content: `Stop trying to be productive 24/7.
-
-I know, it sounds counterintuitive.
-
-But here's the truth:
-
-Your brain needs rest to perform at its best.
-
-When I stopped glorifying "the grind" and started prioritizing recovery:
-
-• My focus improved dramatically
-• My creativity skyrocketed
-• My energy lasted all day
-
-The most successful people I know aren't the ones who work the most hours.
-
-They're the ones who work the RIGHT hours.
-
-What's your take on work-life balance?`,
-          characterCount: 478,
-        },
-      ];
-
-      setGeneratedPosts(mockPosts);
+      setGeneratedPosts(posts);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate posts";
+      alert(message);
+    } finally {
       setIsGenerating(false);
-    }, 2000);
+    }
   };
 
   const handleCopy = (content: string, id: string) => {
@@ -194,6 +256,73 @@ What's your take on work-life balance?`,
   const handleCancelEdit = () => {
     setEditingPostId(null);
     setEditContent("");
+  };
+
+  const handleSaveDraft = async (post: GeneratedPost) => {
+    setSavingPostId(post.id);
+    try {
+      const result = await createPost({
+        content: post.content,
+        source_type: activeTab as "idea" | "url" | "rss",
+        source_url: activeTab === "url" ? urlInput : (activeTab === "rss" ? rssContent.url : null),
+        brand_voice_id: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        formats: selectedFormat !== "None" ? [selectedFormat] : [],
+        tones: selectedTones.filter(t => t !== "None"),
+        angles: selectedAngles.filter(a => a !== "None"),
+        status: "draft",
+      });
+
+      if (result.error) {
+        alert("Failed to save draft: " + result.error);
+      } else {
+        setSavedPosts(prev => new Set(prev).add(post.id));
+      }
+    } catch {
+      alert("Failed to save draft");
+    } finally {
+      setSavingPostId(null);
+    }
+  };
+
+  const handleSchedule = async (post: GeneratedPost) => {
+    // For now, just save as draft with scheduled status
+    // In a full implementation, you'd show a date picker modal
+    setSavingPostId(post.id);
+    try {
+      const scheduledAt = new Date();
+      scheduledAt.setDate(scheduledAt.getDate() + 1); // Schedule for tomorrow
+      scheduledAt.setHours(9, 0, 0, 0); // 9 AM
+
+      const result = await createPost({
+        content: post.content,
+        source_type: activeTab as "idea" | "url" | "rss",
+        source_url: activeTab === "url" ? urlInput : (activeTab === "rss" ? rssContent.url : null),
+        brand_voice_id: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        formats: selectedFormat !== "None" ? [selectedFormat] : [],
+        tones: selectedTones.filter(t => t !== "None"),
+        angles: selectedAngles.filter(a => a !== "None"),
+        status: "scheduled",
+        scheduled_at: scheduledAt.toISOString(),
+      });
+
+      if (result.error) {
+        alert("Failed to schedule post: " + result.error);
+      } else {
+        setSavedPosts(prev => new Set(prev).add(post.id));
+        router.push("/library?filter=scheduled");
+      }
+    } catch {
+      alert("Failed to schedule post");
+    } finally {
+      setSavingPostId(null);
+    }
+  };
+
+  const canGenerate = () => {
+    if (activeTab === "idea") return ideaInput.trim().length > 0;
+    if (activeTab === "url") return urlFetched !== null;
+    if (activeTab === "rss") return rssContent.content.length > 0;
+    return false;
   };
 
   return (
@@ -243,7 +372,7 @@ What's your take on work-life balance?`,
                 <CardContent className="p-6 space-y-4">
                   <div>
                     <label className="text-sm font-medium text-ecco-secondary mb-2 block">
-                      What's your idea?
+                      What&apos;s your idea?
                     </label>
                     <Textarea
                       placeholder="Share your thoughts, insights, or experiences you want to turn into a post..."
@@ -259,7 +388,7 @@ What's your take on work-life balance?`,
                     </p>
                     <Button
                       onClick={handleGenerate}
-                      disabled={!ideaInput.trim() || isGenerating}
+                      disabled={!canGenerate() || isGenerating}
                       className="bg-ecco-navy hover:bg-ecco-navy-light"
                     >
                       {isGenerating ? (
@@ -286,12 +415,43 @@ What's your take on work-life balance?`,
                     <label className="text-sm font-medium text-ecco-secondary mb-2 block">
                       Article URL
                     </label>
-                    <Input
-                      placeholder="Paste the URL of an article you want to transform..."
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Paste the URL of an article you want to transform..."
+                        value={urlInput}
+                        onChange={(e) => {
+                          setUrlInput(e.target.value);
+                          setUrlFetched(null);
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={fetchUrlContent}
+                        disabled={!urlInput.trim() || isFetchingUrl}
+                      >
+                        {isFetchingUrl ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Fetch
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
+
+                  {urlFetched && (
+                    <div className="p-4 bg-ecco-off-white rounded-lg">
+                      <h4 className="font-medium text-sm text-ecco-primary mb-2">
+                        {urlFetched.title || "Article fetched"}
+                      </h4>
+                      <p className="text-xs text-ecco-tertiary line-clamp-3">
+                        {urlFetched.content.substring(0, 300)}...
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
                     <p className="text-xs text-ecco-tertiary">
@@ -299,7 +459,7 @@ What's your take on work-life balance?`,
                     </p>
                     <Button
                       onClick={handleGenerate}
-                      disabled={!urlInput.trim() || isGenerating}
+                      disabled={!canGenerate() || isGenerating}
                       className="bg-ecco-navy hover:bg-ecco-navy-light"
                     >
                       {isGenerating ? (
@@ -321,16 +481,64 @@ What's your take on work-life balance?`,
 
             <TabsContent value="rss" className="m-0">
               <Card className="border-ecco">
-                <CardContent className="p-6">
-                  <p className="text-sm text-ecco-tertiary mb-4">
-                    Select an article from your RSS feeds to generate a post.
-                  </p>
-                  <Button variant="outline" asChild>
-                    <a href="/feeds">
-                      <Rss className="mr-2 h-4 w-4" />
-                      Go to Feeds
-                    </a>
-                  </Button>
+                <CardContent className="p-6 space-y-4">
+                  {rssContent.title ? (
+                    <>
+                      <div className="p-4 bg-ecco-off-white rounded-lg">
+                        <h4 className="font-medium text-sm text-ecco-primary mb-2">
+                          {rssContent.title}
+                        </h4>
+                        <p className="text-xs text-ecco-tertiary line-clamp-3">
+                          {rssContent.content.substring(0, 300)}...
+                        </p>
+                        {rssContent.url && (
+                          <a
+                            href={rssContent.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-ecco-accent hover:underline mt-2 inline-flex items-center"
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Read original
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
+                        <p className="text-xs text-ecco-tertiary">
+                          Generate 2 variations
+                        </p>
+                        <Button
+                          onClick={handleGenerate}
+                          disabled={!canGenerate() || isGenerating}
+                          className="bg-ecco-navy hover:bg-ecco-navy-light"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Generate Posts
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-ecco-tertiary mb-4">
+                        Select an article from your RSS feeds to generate a post.
+                      </p>
+                      <Button variant="outline" asChild>
+                        <a href="/feeds">
+                          <Rss className="mr-2 h-4 w-4" />
+                          Go to Feeds
+                        </a>
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -414,6 +622,11 @@ What's your take on work-life balance?`,
                       ) : (
                         /* View Mode */
                         <>
+                          {post.approach && (
+                            <p className="text-xs text-ecco-accent font-medium mb-2">
+                              {post.approach}
+                            </p>
+                          )}
                           <p className="text-sm text-ecco-primary whitespace-pre-wrap leading-relaxed">
                             {post.content}
                           </p>
@@ -446,15 +659,29 @@ What's your take on work-life balance?`,
                               <Button
                                 variant="secondary"
                                 size="sm"
+                                onClick={() => handleSaveDraft(post)}
+                                disabled={savingPostId === post.id || savedPosts.has(post.id)}
                               >
-                                <Save className="mr-1.5 h-3.5 w-3.5" />
-                                Save Draft
+                                {savingPostId === post.id ? (
+                                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                ) : savedPosts.has(post.id) ? (
+                                  <Check className="mr-1.5 h-3.5 w-3.5 text-ecco-success" />
+                                ) : (
+                                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                                )}
+                                {savedPosts.has(post.id) ? "Saved" : "Save Draft"}
                               </Button>
                               <Button
                                 variant="secondary"
                                 size="sm"
+                                onClick={() => handleSchedule(post)}
+                                disabled={savingPostId === post.id || savedPosts.has(post.id)}
                               >
-                                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                                {savingPostId === post.id ? (
+                                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                                )}
                                 Schedule
                               </Button>
                             </div>
@@ -614,10 +841,17 @@ What's your take on work-life balance?`,
                   <p className="text-sm font-semibold text-ecco-blue mb-3">
                     Brand Voice
                   </p>
-                  <select className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
-                    <option>Default Voice</option>
-                    <option>Professional Thought Leader</option>
-                    <option>Friendly Expert</option>
+                  <select
+                    value={selectedBrandVoice}
+                    onChange={(e) => setSelectedBrandVoice(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary"
+                  >
+                    <option value="none">Default Voice</option>
+                    {brandVoices.map((voice) => (
+                      <option key={voice.id} value={voice.id}>
+                        {voice.name}
+                      </option>
+                    ))}
                   </select>
                   <p className="text-[10px] text-ecco-muted mt-2 italic">
                     Configure your brand voice in Settings
