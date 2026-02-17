@@ -11,9 +11,11 @@ import {
   FileText,
   Loader2,
   Sparkles,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { usePosts } from "@/hooks/use-posts";
+import { useBrandVoices } from "@/hooks/use-brand-voices";
 import { formatDistanceToNow } from "@/lib/utils";
 
 // Quick actions
@@ -46,6 +48,7 @@ const quickActions = [
 
 export default function DashboardPage() {
   const { posts, loading } = usePosts();
+  const { brandVoices, loading: voicesLoading } = useBrandVoices();
 
   // Calculate stats from actual posts
   const now = new Date();
@@ -112,7 +115,10 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
+  // Check if user has no custom brand voices set up
+  const hasCustomVoice = brandVoices.length > 0;
+
+  if (loading || voicesLoading) {
     return (
       <div className="space-y-8">
         <div>
@@ -160,6 +166,36 @@ export default function DashboardPage() {
             >
               <Link href="/create">
                 Create Your First Post
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Voice Setup Banner (show when no custom voice set up) */}
+      {!hasCustomVoice && (
+        <div className="rounded-xl bg-gradient-to-r from-ecco-blue to-ecco-accent p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+                <MessageSquare className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  Set Up Your Custom Voice
+                </h3>
+                <p className="text-sm text-white/80">
+                  Define your unique brand voice so AI-generated content sounds authentically like you.
+                </p>
+              </div>
+            </div>
+            <Button
+              asChild
+              className="bg-white text-ecco-blue hover:bg-white/90"
+            >
+              <Link href="/settings?tab=brand-voice">
+                Configure Voice
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

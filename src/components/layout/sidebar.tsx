@@ -15,7 +15,11 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  Shield,
 } from "lucide-react";
+
+// Admin email whitelist
+const ADMIN_EMAILS = ["aujena.dpree@gmail.com"];
 
 const navItems = [
   {
@@ -57,6 +61,12 @@ const bottomNavItems = [
     icon: Settings,
   },
 ];
+
+const adminNavItem = {
+  name: "Admin",
+  href: "/admin",
+  icon: Shield,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -106,6 +116,9 @@ export function Sidebar() {
     return "Free Plan";
   };
 
+  // Check if user is admin
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-border bg-white">
       <div className="flex h-full flex-col">
@@ -142,7 +155,7 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom Navigation */}
-        <div className="border-t border-border px-3 py-4">
+        <div className="border-t border-border px-3 py-4 space-y-1">
           {bottomNavItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -161,6 +174,22 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Admin Link - Only shown for admin users */}
+          {isAdmin && (
+            <Link
+              href={adminNavItem.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                pathname === adminNavItem.href
+                  ? "bg-ecco-navy text-white"
+                  : "text-ecco-navy hover:bg-ecco-accent-light hover:text-ecco-navy"
+              )}
+            >
+              <adminNavItem.icon className="h-5 w-5" strokeWidth={1.75} />
+              {adminNavItem.name}
+            </Link>
+          )}
         </div>
 
         {/* User Section */}

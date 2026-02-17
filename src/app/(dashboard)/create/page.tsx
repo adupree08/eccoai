@@ -21,6 +21,7 @@ import {
   Check,
   Loader2,
   ExternalLink,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePosts } from "@/hooks/use-posts";
@@ -119,6 +120,9 @@ function CreatePostContent() {
     content: contentParam || "",
   });
   const [rssAngle, setRssAngle] = useState("");
+  const [commentPostText, setCommentPostText] = useState("");
+  const [commentAngle, setCommentAngle] = useState("");
+  const [generatedComments, setGeneratedComments] = useState<GeneratedPost[]>([]);
   const [selectedTones, setSelectedTones] = useState<string[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<string>("None");
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
@@ -195,6 +199,10 @@ function CreatePostContent() {
         url = rssContent.url;
         content = `Title: ${rssContent.title}\n\n${rssContent.content}`;
         userAngle = rssAngle;
+      } else if (activeTab === "comment") {
+        sourceType = "comment";
+        content = commentPostText;
+        userAngle = commentAngle;
       }
 
       const response = await fetch("/api/generate", {
@@ -209,7 +217,7 @@ function CreatePostContent() {
           tones: selectedTones.filter(t => t !== "None"),
           angles: selectedAngles.filter(a => a !== "None"),
           brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
-          length: selectedLength,
+          length: activeTab === "comment" ? "Short" : selectedLength,
         }),
       });
 
@@ -227,7 +235,11 @@ function CreatePostContent() {
         characterCount: post.content.length,
       }));
 
-      setGeneratedPosts(posts);
+      if (activeTab === "comment") {
+        setGeneratedComments(posts);
+      } else {
+        setGeneratedPosts(posts);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate posts";
       alert(message);
@@ -328,6 +340,7 @@ function CreatePostContent() {
     if (activeTab === "idea") return ideaInput.trim().length > 0;
     if (activeTab === "url") return urlFetched !== null;
     if (activeTab === "rss") return rssContent.content.length > 0;
+    if (activeTab === "comment") return commentPostText.trim().length > 0;
     return false;
   };
 
@@ -366,6 +379,13 @@ function CreatePostContent() {
           >
             <Rss className="mr-2 h-4 w-4" />
             From RSS
+          </TabsTrigger>
+          <TabsTrigger
+            value="comment"
+            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+          >
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Comment
           </TabsTrigger>
         </TabsList>
 
@@ -580,6 +600,131 @@ function CreatePostContent() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="comment" className="m-0">
+              <Card className="border-ecco">
+                <CardContent className="p-6 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-ecco-secondary mb-2 block">
+                      Post you want to comment on
+                    </label>
+                    <Textarea
+                      placeholder="Paste the LinkedIn post text you want to respond to..."
+                      value={commentPostText}
+                      onChange={(e) => setCommentPostText(e.target.value)}
+                      className="min-h-[120px] resize-none"
+                    />
+                    <p className="text-xs text-ecco-muted mt-1.5">
+                      Copy and paste the full text of the post you want to comment on
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-ecco-secondary mb-2 block">
+                      Your angle or perspective
+                    </label>
+                    <Textarea
+                      placeholder="What point do you want to make? What value can you add to the conversation?..."
+                      value={commentAngle}
+                      onChange={(e) => setCommentAngle(e.target.value)}
+                      className="min-h-[80px] resize-none"
+                    />
+                    <p className="text-xs text-ecco-muted mt-1.5">
+                      This helps create a comment that adds genuine value to the discussion
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-ecco-accent-light rounded-lg">
+                    <p className="text-xs text-ecco-blue font-medium">
+                      💡 Comments are kept concise (300-500 characters) to maximize engagement
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
+                    <p className="text-xs text-ecco-tertiary">
+                      Generate 2 comment variations
+                    </p>
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={!canGenerate() || isGenerating}
+                      className="bg-ecco-navy hover:bg-ecco-navy-light"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Generate Comments
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Generated Comments */}
+              {generatedComments.length > 0 && (
+                <div className="space-y-4 mt-6">
+                  <h2 className="text-base font-semibold text-ecco-primary">
+                    Generated Comments
+                  </h2>
+                  {generatedComments.map((comment) => (
+                    <Card key={comment.id} className="border-ecco">
+                      <CardContent className="p-5">
+                        {comment.approach && (
+                          <p className="text-xs text-ecco-accent font-medium mb-2">
+                            {comment.approach}
+                          </p>
+                        )}
+                        <p className="text-sm text-ecco-primary whitespace-pre-wrap leading-relaxed">
+                          {comment.content}
+                        </p>
+
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-ecco-light">
+                          <span className="text-xs text-ecco-tertiary">
+                            {comment.characterCount} characters
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleCopy(comment.content, comment.id)}
+                            >
+                              {copiedId === comment.id ? (
+                                <Check className="h-4 w-4 text-ecco-success" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleCopy(comment.content, comment.id)}
+                            >
+                              {copiedId === comment.id ? (
+                                <>
+                                  <Check className="mr-1.5 h-3.5 w-3.5 text-ecco-success" />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                  Copy Comment
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             {/* Generated Posts */}

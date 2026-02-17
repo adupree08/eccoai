@@ -70,6 +70,8 @@ export async function POST(request: Request) {
 
     // Build the user prompt based on source type
     let sourceContext = "";
+    let isComment = false;
+
     if (sourceType === "idea") {
       sourceContext = `Create a LinkedIn post based on this idea:\n\n"${content}"`;
     } else if (sourceType === "url") {
@@ -82,17 +84,58 @@ export async function POST(request: Request) {
       if (userAngle && userAngle.trim()) {
         sourceContext += `\n\nIMPORTANT - The user wants to incorporate this personal angle or perspective:\n"${userAngle}"\n\nMake sure to weave their perspective into the post.`;
       }
+    } else if (sourceType === "comment") {
+      isComment = true;
+      sourceContext = `Generate a thoughtful, engaging LinkedIn comment to respond to this post:\n\n--- ORIGINAL POST ---\n${content}\n--- END OF POST ---`;
+      if (userAngle && userAngle.trim()) {
+        sourceContext += `\n\nThe user wants to make this point or take this angle in their comment:\n"${userAngle}"`;
+      }
     }
 
     // Length guidance
-    const lengthMap: Record<string, string> = {
-      "Short": "Keep the post around 100 words or less.",
-      "Medium": "Aim for around 150-200 words.",
-      "Long": "Write an extended post of 250-350 words.",
-    };
-    const lengthGuidance = lengthMap[length] || "Aim for around 150-200 words.";
+    let lengthGuidance = "";
+    if (isComment) {
+      lengthGuidance = "CRITICAL: Keep each comment CONCISE - between 300-500 characters total (not words). Comments should be punchy and add value quickly. No filler text.";
+    } else {
+      const lengthMap: Record<string, string> = {
+        "Short": "Keep the post around 100 words or less.",
+        "Medium": "Aim for around 150-200 words.",
+        "Long": "Write an extended post of 250-350 words.",
+      };
+      lengthGuidance = lengthMap[length] || "Aim for around 150-200 words.";
+    }
 
-    const userPrompt = `${sourceContext}
+    let userPrompt = "";
+
+    if (isComment) {
+      userPrompt = `${sourceContext}
+
+${lengthGuidance}
+
+Generate 2 different comment variations. Each should:
+- Add genuine value to the conversation
+- Be concise and punchy (300-500 characters max each)
+- Avoid generic phrases like "Great post!" or "Thanks for sharing!"
+- Share a unique insight, ask a thoughtful question, or add a relevant personal experience
+- Sound natural and conversational, not salesy or self-promotional
+
+IMPORTANT: Return your response as valid JSON in this exact format:
+{
+  "posts": [
+    {
+      "content": "The full comment text here (300-500 chars)",
+      "hook": "The opening phrase",
+      "approach": "Brief 5-10 word description of the approach"
+    },
+    {
+      "content": "The second comment variation here (300-500 chars)",
+      "hook": "The opening phrase",
+      "approach": "Brief 5-10 word description"
+    }
+  ]
+}`;
+    } else {
+      userPrompt = `${sourceContext}
 
 ${lengthGuidance}
 
@@ -113,6 +156,7 @@ IMPORTANT: Return your response as valid JSON in this exact format:
     }
   ]
 }`;
+    }
 
     const anthropic = getAnthropic();
 
