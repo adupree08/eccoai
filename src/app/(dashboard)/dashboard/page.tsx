@@ -7,42 +7,16 @@ import {
   Link2,
   Rss,
   ArrowRight,
-  TrendingUp,
-  TrendingDown,
   Calendar,
   FileText,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import { usePosts } from "@/hooks/use-posts";
+import { formatDistanceToNow } from "@/lib/utils";
 
-// Stats data (will come from Supabase later)
-const stats = [
-  {
-    label: "Posts This Month",
-    value: "12",
-    change: "+3",
-    changeType: "positive" as const,
-  },
-  {
-    label: "Total Impressions",
-    value: "4,832",
-    change: "+18%",
-    changeType: "positive" as const,
-  },
-  {
-    label: "Engagement Rate",
-    value: "3.2%",
-    change: "-0.4%",
-    changeType: "negative" as const,
-  },
-  {
-    label: "Drafts",
-    value: "5",
-    change: "",
-    changeType: "neutral" as const,
-  },
-];
-
-// Quick actions (removed Viral Posts as per user request)
+// Quick actions
 const quickActions = [
   {
     title: "Create from Idea",
@@ -70,48 +44,92 @@ const quickActions = [
   },
 ];
 
-// Recent drafts (will come from Supabase later)
-const recentDrafts = [
-  {
-    id: 1,
-    content: "Just discovered an incredible productivity hack that has transformed my morning routine. Here's what I learned about...",
-    updatedAt: "2 hours ago",
-  },
-  {
-    id: 2,
-    content: "The future of AI in content creation is here. After testing 15 different tools, these are my top 3 picks for...",
-    updatedAt: "Yesterday",
-  },
-  {
-    id: 3,
-    content: "Why I stopped chasing viral content and focused on building genuine connections instead. The results surprised me...",
-    updatedAt: "3 days ago",
-  },
-];
-
-// Scheduled posts (will come from Supabase later)
-const scheduledPosts = [
-  {
-    id: 1,
-    content: "5 leadership lessons I learned from my first year as a founder...",
-    scheduledDate: new Date(2025, 1, 20),
-    time: "9:00 AM",
-  },
-  {
-    id: 2,
-    content: "The one question that changed how I approach networking events...",
-    scheduledDate: new Date(2025, 1, 22),
-    time: "12:00 PM",
-  },
-  {
-    id: 3,
-    content: "Remote work isn't the future—it's the present. Here's how our team...",
-    scheduledDate: new Date(2025, 1, 25),
-    time: "8:30 AM",
-  },
-];
-
 export default function DashboardPage() {
+  const { posts, loading } = usePosts();
+
+  // Calculate stats from actual posts
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const postsThisMonth = posts.filter(p => new Date(p.created_at) >= thirtyDaysAgo).length;
+  const drafts = posts.filter(p => p.status === "draft");
+  const scheduled = posts.filter(p => p.status === "scheduled");
+  const published = posts.filter(p => p.status === "published");
+
+  // Get total impressions from published posts
+  const totalImpressions = published.reduce((sum, p) => sum + (p.impressions || 0), 0);
+
+  // Get recent drafts (last 3)
+  const recentDrafts = drafts
+    .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
+    .slice(0, 3);
+
+  // Get upcoming scheduled posts (next 3)
+  const upcomingPosts = scheduled
+    .filter(p => p.scheduled_at && new Date(p.scheduled_at) >= now)
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
+    .slice(0, 3);
+
+  const stats = [
+    {
+      label: "Posts This Month",
+      value: postsThisMonth.toString(),
+    },
+    {
+      label: "Total Impressions",
+      value: totalImpressions.toLocaleString(),
+    },
+    {
+      label: "Scheduled",
+      value: scheduled.length.toString(),
+    },
+    {
+      label: "Drafts",
+      value: drafts.length.toString(),
+    },
+  ];
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    try {
+      return formatDistanceToNow(new Date(dateString));
+    } catch {
+      return "";
+    }
+  };
+
+  const formatScheduledDate = (dateString: string | null) => {
+    if (!dateString) return { day: "--", month: "---", time: "--:--" };
+    try {
+      const date = new Date(dateString);
+      return {
+        day: date.getDate().toString(),
+        month: date.toLocaleString("default", { month: "short" }),
+        time: date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      };
+    } catch {
+      return { day: "--", month: "---", time: "--:--" };
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ecco-primary">
+            Dashboard
+          </h1>
+          <p className="text-sm text-ecco-tertiary">
+            Welcome back! Here&apos;s an overview of your content.
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
@@ -120,32 +138,34 @@ export default function DashboardPage() {
           Dashboard
         </h1>
         <p className="text-sm text-ecco-tertiary">
-          Welcome back! Here's an overview of your content.
+          Welcome back! Here&apos;s an overview of your content.
         </p>
       </div>
 
-      {/* Setup Banner (show when brand voice not configured) */}
-      <div className="rounded-xl bg-ecco-gradient p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-white">
-              Complete Your Setup
-            </h3>
-            <p className="text-sm text-white/80">
-              Configure your brand voice to generate content that sounds like you.
-            </p>
+      {/* Setup Banner (show when no posts yet) */}
+      {posts.length === 0 && (
+        <div className="rounded-xl bg-ecco-gradient p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-white">
+                Get Started with ecco
+              </h3>
+              <p className="text-sm text-white/80">
+                Create your first LinkedIn post using AI-powered content generation.
+              </p>
+            </div>
+            <Button
+              asChild
+              className="bg-white text-ecco-primary hover:bg-white/90"
+            >
+              <Link href="/create">
+                Create Your First Post
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
           </div>
-          <Button
-            asChild
-            className="bg-white text-ecco-primary hover:bg-white/90"
-          >
-            <Link href="/settings">
-              Set Up Brand Voice
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
         </div>
-      </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -156,25 +176,6 @@ export default function DashboardPage() {
               <p className="mt-2 text-3xl font-bold text-ecco-primary">
                 {stat.value}
               </p>
-              {stat.change && (
-                <p
-                  className={`mt-1 flex items-center text-xs ${
-                    stat.changeType === "positive"
-                      ? "text-ecco-success"
-                      : stat.changeType === "negative"
-                      ? "text-ecco-error"
-                      : "text-ecco-muted"
-                  }`}
-                >
-                  {stat.changeType === "positive" && (
-                    <TrendingUp className="mr-1 h-3 w-3" />
-                  )}
-                  {stat.changeType === "negative" && (
-                    <TrendingDown className="mr-1 h-3 w-3" />
-                  )}
-                  {stat.change}
-                </p>
-              )}
             </CardContent>
           </Card>
         ))}
@@ -216,21 +217,34 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-0">
-            {recentDrafts.map((draft, index) => (
-              <div
-                key={draft.id}
-                className={`py-4 ${
-                  index !== recentDrafts.length - 1 ? "border-b border-ecco-light" : ""
-                }`}
-              >
-                <p className="line-clamp-2 text-sm text-ecco-primary">
-                  {draft.content}
-                </p>
-                <p className="mt-2 text-xs text-ecco-tertiary">
-                  {draft.updatedAt}
-                </p>
+            {recentDrafts.length > 0 ? (
+              recentDrafts.map((draft, index) => (
+                <div
+                  key={draft.id}
+                  className={`py-4 ${
+                    index !== recentDrafts.length - 1 ? "border-b border-ecco-light" : ""
+                  }`}
+                >
+                  <p className="line-clamp-2 text-sm text-ecco-primary">
+                    {draft.content}
+                  </p>
+                  <p className="mt-2 text-xs text-ecco-tertiary">
+                    {formatDate(draft.updated_at || draft.created_at)}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center">
+                <FileText className="h-8 w-8 text-ecco-muted mx-auto mb-2" />
+                <p className="text-sm text-ecco-tertiary">No drafts yet</p>
+                <Link href="/create">
+                  <Button variant="link" size="sm" className="mt-2 text-ecco-accent">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    Create your first post
+                  </Button>
+                </Link>
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
 
@@ -247,29 +261,44 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-0">
-            {scheduledPosts.map((post, index) => (
-              <div
-                key={post.id}
-                className={`flex items-center gap-4 py-4 ${
-                  index !== scheduledPosts.length - 1 ? "border-b border-ecco-light" : ""
-                }`}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <span className="text-xl font-bold text-ecco-primary">
-                    {post.scheduledDate.getDate()}
-                  </span>
-                  <span className="text-[10px] uppercase text-ecco-tertiary">
-                    {post.scheduledDate.toLocaleString("default", { month: "short" })}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="line-clamp-1 text-sm text-ecco-primary">
-                    {post.content}
-                  </p>
-                  <p className="mt-1 text-xs text-ecco-tertiary">{post.time}</p>
-                </div>
+            {upcomingPosts.length > 0 ? (
+              upcomingPosts.map((post, index) => {
+                const scheduled = formatScheduledDate(post.scheduled_at);
+                return (
+                  <div
+                    key={post.id}
+                    className={`flex items-center gap-4 py-4 ${
+                      index !== upcomingPosts.length - 1 ? "border-b border-ecco-light" : ""
+                    }`}
+                  >
+                    <div className="flex flex-col items-center text-center">
+                      <span className="text-xl font-bold text-ecco-primary">
+                        {scheduled.day}
+                      </span>
+                      <span className="text-[10px] uppercase text-ecco-tertiary">
+                        {scheduled.month}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="line-clamp-1 text-sm text-ecco-primary">
+                        {post.content}
+                      </p>
+                      <p className="mt-1 text-xs text-ecco-tertiary">{scheduled.time}</p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-8 text-center">
+                <Calendar className="h-8 w-8 text-ecco-muted mx-auto mb-2" />
+                <p className="text-sm text-ecco-tertiary">No scheduled posts</p>
+                <Link href="/library?filter=drafts">
+                  <Button variant="link" size="sm" className="mt-2 text-ecco-accent">
+                    Schedule a draft
+                  </Button>
+                </Link>
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
       </div>
