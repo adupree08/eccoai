@@ -25,6 +25,7 @@ import {
   Check,
   Loader2,
   CalendarDays,
+  CalendarX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -44,13 +45,17 @@ function DraggablePost({
   isExpanded,
   onToggleExpand,
   onCopy,
+  onUnschedule,
   copiedId,
+  unschedulingId,
 }: {
   post: ScheduledPost;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onCopy: (content: string, id: string) => void;
+  onUnschedule: (id: string) => void;
   copiedId: string | null;
+  unschedulingId: string | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: post.id,
@@ -113,24 +118,40 @@ function DraggablePost({
           <p className="text-ecco-primary whitespace-pre-wrap leading-relaxed mb-3 max-h-[150px] overflow-y-auto">
             {post.content}
           </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-7 text-xs w-full"
-            onClick={() => onCopy(post.content, post.id)}
-          >
-            {copiedId === post.id ? (
-              <>
-                <Check className="mr-1 h-3 w-3 text-ecco-success" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="mr-1 h-3 w-3" />
-                Copy for Posting
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs flex-1"
+              onClick={() => onCopy(post.content, post.id)}
+            >
+              {copiedId === post.id ? (
+                <>
+                  <Check className="mr-1 h-3 w-3 text-ecco-success" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1 h-3 w-3" />
+                  Copy
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs flex-1 text-ecco-error hover:text-ecco-error"
+              onClick={() => onUnschedule(post.id)}
+              disabled={unschedulingId === post.id}
+            >
+              {unschedulingId === post.id ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <CalendarX className="mr-1 h-3 w-3" />
+              )}
+              Unschedule
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -146,7 +167,9 @@ function DroppableDay({
   expandedPostId,
   onToggleExpand,
   onCopy,
+  onUnschedule,
   copiedId,
+  unschedulingId,
 }: {
   date: Date;
   isCurrentMonth: boolean;
@@ -155,7 +178,9 @@ function DroppableDay({
   expandedPostId: string | null;
   onToggleExpand: (postId: string) => void;
   onCopy: (content: string, id: string) => void;
+  onUnschedule: (id: string) => void;
   copiedId: string | null;
+  unschedulingId: string | null;
 }) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -199,7 +224,9 @@ function DroppableDay({
             isExpanded={expandedPostId === post.id}
             onToggleExpand={() => onToggleExpand(post.id)}
             onCopy={onCopy}
+            onUnschedule={onUnschedule}
             copiedId={copiedId}
+            unschedulingId={unschedulingId}
           />
         ))}
       </div>
@@ -212,8 +239,9 @@ export default function CalendarPage() {
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [unschedulingId, setUnschedulingId] = useState<string | null>(null);
 
-  const { posts, loading, updatePost } = usePosts();
+  const { posts, loading, updatePost, unschedulePost } = usePosts();
 
   // Convert scheduled posts from database to calendar format
   const scheduledPosts: ScheduledPost[] = useMemo(() => {
@@ -328,6 +356,18 @@ export default function CalendarPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleUnschedule = async (postId: string) => {
+    setUnschedulingId(postId);
+    try {
+      await unschedulePost(postId);
+      setExpandedPostId(null);
+    } catch {
+      alert("Failed to unschedule post");
+    } finally {
+      setUnschedulingId(null);
+    }
+  };
+
   const activePost = activeId ? scheduledPosts.find((p) => p.id === activeId) : null;
 
   if (loading) {
@@ -440,7 +480,9 @@ export default function CalendarPage() {
                   expandedPostId={expandedPostId}
                   onToggleExpand={handleToggleExpand}
                   onCopy={handleCopy}
+                  onUnschedule={handleUnschedule}
                   copiedId={copiedId}
+                  unschedulingId={unschedulingId}
                 />
               );
             })}
@@ -495,21 +537,39 @@ export default function CalendarPage() {
                         </p>
                         <p className="text-xs text-ecco-tertiary">{post.time}</p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopy(post.content, post.id);
-                        }}
-                      >
-                        {copiedId === post.id ? (
-                          <Check className="h-4 w-4 text-ecco-success" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(post.content, post.id);
+                          }}
+                        >
+                          {copiedId === post.id ? (
+                            <Check className="h-4 w-4 text-ecco-success" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-ecco-error hover:text-ecco-error hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUnschedule(post.id);
+                          }}
+                          disabled={unschedulingId === post.id}
+                        >
+                          {unschedulingId === post.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CalendarX className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   ))}
               </div>

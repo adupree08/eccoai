@@ -103,6 +103,13 @@ export function usePosts(status?: "draft" | "scheduled" | "published") {
     });
   };
 
+  const unschedulePost = async (id: string) => {
+    return updatePost(id, {
+      status: "draft",
+      scheduled_at: null,
+    });
+  };
+
   const publishPost = async (id: string) => {
     return updatePost(id, {
       status: "published",
@@ -118,6 +125,7 @@ export function usePosts(status?: "draft" | "scheduled" | "published") {
     updatePost,
     deletePost,
     schedulePost,
+    unschedulePost,
     publishPost,
     refetch: fetchPosts,
   };
