@@ -112,11 +112,13 @@ function CreatePostContent() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [ideaInput, setIdeaInput] = useState("");
   const [urlInput, setUrlInput] = useState(urlParam || "");
+  const [urlAngle, setUrlAngle] = useState("");
   const [rssContent, setRssContent] = useState({
     title: titleParam || "",
     url: urlParam || "",
     content: contentParam || "",
   });
+  const [rssAngle, setRssAngle] = useState("");
   const [selectedTones, setSelectedTones] = useState<string[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<string>("None");
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
@@ -178,6 +180,7 @@ function CreatePostContent() {
       let sourceType = activeTab;
       let content = "";
       let url = "";
+      let userAngle = "";
 
       if (activeTab === "idea") {
         sourceType = "idea";
@@ -186,10 +189,12 @@ function CreatePostContent() {
         sourceType = "url";
         url = urlInput;
         content = urlFetched?.content || "";
+        userAngle = urlAngle;
       } else if (activeTab === "rss") {
         sourceType = "rss";
         url = rssContent.url;
         content = `Title: ${rssContent.title}\n\n${rssContent.content}`;
+        userAngle = rssAngle;
       }
 
       const response = await fetch("/api/generate", {
@@ -199,6 +204,7 @@ function CreatePostContent() {
           sourceType,
           content,
           url,
+          userAngle,
           format: selectedFormat !== "None" ? selectedFormat : null,
           tones: selectedTones.filter(t => t !== "None"),
           angles: selectedAngles.filter(a => a !== "None"),
@@ -443,14 +449,31 @@ function CreatePostContent() {
                   </div>
 
                   {urlFetched && (
-                    <div className="p-4 bg-ecco-off-white rounded-lg">
-                      <h4 className="font-medium text-sm text-ecco-primary mb-2">
-                        {urlFetched.title || "Article fetched"}
-                      </h4>
-                      <p className="text-xs text-ecco-tertiary line-clamp-3">
-                        {urlFetched.content.substring(0, 300)}...
-                      </p>
-                    </div>
+                    <>
+                      <div className="p-4 bg-ecco-off-white rounded-lg">
+                        <h4 className="font-medium text-sm text-ecco-primary mb-2">
+                          {urlFetched.title || "Article fetched"}
+                        </h4>
+                        <p className="text-xs text-ecco-tertiary line-clamp-3">
+                          {urlFetched.content.substring(0, 300)}...
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-ecco-secondary mb-2 block">
+                          Your angle or idea (optional)
+                        </label>
+                        <Textarea
+                          placeholder="Add your personal take, experience, or the angle you want to highlight from this article..."
+                          value={urlAngle}
+                          onChange={(e) => setUrlAngle(e.target.value)}
+                          className="min-h-[80px] resize-none"
+                        />
+                        <p className="text-xs text-ecco-muted mt-1.5">
+                          This helps the AI understand how you want to frame the post
+                        </p>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
@@ -503,6 +526,22 @@ function CreatePostContent() {
                           </a>
                         )}
                       </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-ecco-secondary mb-2 block">
+                          Your angle or idea (optional)
+                        </label>
+                        <Textarea
+                          placeholder="Add your personal take, experience, or the angle you want to highlight from this article..."
+                          value={rssAngle}
+                          onChange={(e) => setRssAngle(e.target.value)}
+                          className="min-h-[80px] resize-none"
+                        />
+                        <p className="text-xs text-ecco-muted mt-1.5">
+                          This helps the AI understand how you want to frame the post
+                        </p>
+                      </div>
+
                       <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
                         <p className="text-xs text-ecco-tertiary">
                           Generate 2 variations

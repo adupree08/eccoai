@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS feeds (
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   url TEXT NOT NULL,
+  feed_type TEXT DEFAULT 'url' CHECK (feed_type IN ('url', 'keyword')),
+  keywords TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   last_fetched_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),

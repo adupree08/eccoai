@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       sourceType,
       content,
       url,
+      userAngle,
       format,
       tones,
       angles,
@@ -73,8 +74,14 @@ export async function POST(request: Request) {
       sourceContext = `Create a LinkedIn post based on this idea:\n\n"${content}"`;
     } else if (sourceType === "url") {
       sourceContext = `Create a LinkedIn post inspired by this article:\nURL: ${url}\nContent/Summary: ${content}`;
+      if (userAngle && userAngle.trim()) {
+        sourceContext += `\n\nIMPORTANT - The user wants to incorporate this personal angle or perspective:\n"${userAngle}"\n\nMake sure to weave their perspective into the post.`;
+      }
     } else if (sourceType === "rss") {
       sourceContext = `Create a LinkedIn post based on this article:\n\n"${content}"`;
+      if (userAngle && userAngle.trim()) {
+        sourceContext += `\n\nIMPORTANT - The user wants to incorporate this personal angle or perspective:\n"${userAngle}"\n\nMake sure to weave their perspective into the post.`;
+      }
     }
 
     // Length guidance

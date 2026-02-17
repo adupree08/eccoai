@@ -85,6 +85,8 @@ export interface Database {
           user_id: string;
           name: string;
           url: string;
+          feed_type: "url" | "keyword";
+          keywords: string | null;
           is_active: boolean;
           last_fetched_at: string | null;
           created_at: string;
@@ -95,6 +97,8 @@ export interface Database {
           user_id: string;
           name: string;
           url: string;
+          feed_type?: "url" | "keyword";
+          keywords?: string | null;
           is_active?: boolean;
           last_fetched_at?: string | null;
           created_at?: string;
@@ -105,6 +109,8 @@ export interface Database {
           user_id?: string;
           name?: string;
           url?: string;
+          feed_type?: "url" | "keyword";
+          keywords?: string | null;
           is_active?: boolean;
           last_fetched_at?: string | null;
           created_at?: string;

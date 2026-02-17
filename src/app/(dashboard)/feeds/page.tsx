@@ -25,6 +25,8 @@ import {
   Check,
   X,
   Rss,
+  Search,
+  Link2,
 } from "lucide-react";
 import { useFeeds } from "@/hooks/use-feeds";
 import { createClient } from "@/lib/supabase/client";
@@ -46,6 +48,8 @@ export default function FeedsPage() {
   const [expandedFeeds, setExpandedFeeds] = useState<Set<string>>(new Set());
   const [newFeedUrl, setNewFeedUrl] = useState("");
   const [newFeedName, setNewFeedName] = useState("");
+  const [newFeedKeywords, setNewFeedKeywords] = useState("");
+  const [newFeedType, setNewFeedType] = useState<"url" | "keyword">("url");
   const [isAddingFeed, setIsAddingFeed] = useState(false);
   const [addingFeedLoading, setAddingFeedLoading] = useState(false);
   const [refreshingFeeds, setRefreshingFeeds] = useState<Set<string>>(new Set());
@@ -110,16 +114,30 @@ export default function FeedsPage() {
   };
 
   const handleAddFeed = async () => {
-    if (!newFeedUrl.trim()) return;
+    if (newFeedType === "url" && !newFeedUrl.trim()) return;
+    if (newFeedType === "keyword" && !newFeedKeywords.trim()) return;
 
     setAddingFeedLoading(true);
 
     // Create the feed first
-    const result = await createFeed({
-      name: newFeedName.trim() || "New Feed",
-      url: newFeedUrl.trim(),
+    const feedData: {
+      name: string;
+      url: string;
+      feed_type: "url" | "keyword";
+      keywords?: string;
+      is_active: boolean;
+    } = {
+      name: newFeedName.trim() || (newFeedType === "url" ? "New Feed" : newFeedKeywords.trim()),
+      url: newFeedType === "url" ? newFeedUrl.trim() : "",
+      feed_type: newFeedType,
       is_active: true,
-    });
+    };
+
+    if (newFeedType === "keyword") {
+      feedData.keywords = newFeedKeywords.trim();
+    }
+
+    const result = await createFeed(feedData);
 
     if (result.error) {
       alert("Failed to add feed: " + result.error);
@@ -134,6 +152,8 @@ export default function FeedsPage() {
 
     setNewFeedUrl("");
     setNewFeedName("");
+    setNewFeedKeywords("");
+    setNewFeedType("url");
     setIsAddingFeed(false);
     setAddingFeedLoading(false);
   };
@@ -142,7 +162,13 @@ export default function FeedsPage() {
     setRefreshingFeeds(prev => new Set(prev).add(feedId));
 
     try {
-      const response = await fetch("/api/feeds/refresh", {
+      // Find the feed to determine its type
+      const feed = feeds.find(f => f.id === feedId);
+      const endpoint = feed?.feed_type === "keyword"
+        ? "/api/feeds/search-keywords"
+        : "/api/feeds/refresh";
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedId }),
@@ -258,37 +284,96 @@ export default function FeedsPage() {
       {/* Add Feed Form */}
       {isAddingFeed && (
         <Card className="border-ecco border-dashed">
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-4 space-y-4">
+            {/* Feed Type Toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setNewFeedType("url")}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  newFeedType === "url"
+                    ? "bg-ecco-navy text-white border-ecco-navy"
+                    : "bg-white text-ecco-tertiary border-ecco hover:border-ecco-navy"
+                }`}
+              >
+                <Link2 className="inline-block mr-2 h-4 w-4" />
+                From URL
+              </button>
+              <button
+                onClick={() => setNewFeedType("keyword")}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  newFeedType === "keyword"
+                    ? "bg-ecco-navy text-white border-ecco-navy"
+                    : "bg-white text-ecco-tertiary border-ecco hover:border-ecco-navy"
+                }`}
+              >
+                <Search className="inline-block mr-2 h-4 w-4" />
+                From Keywords
+              </button>
+            </div>
+
             <div className="flex items-center gap-4">
               <Input
-                placeholder="Feed name (optional, will auto-detect)"
+                placeholder="Feed name (optional)"
                 value={newFeedName}
                 onChange={(e) => setNewFeedName(e.target.value)}
                 className="flex-1"
               />
             </div>
-            <div className="flex items-center gap-4">
-              <Input
-                placeholder="Enter RSS feed URL..."
-                value={newFeedUrl}
-                onChange={(e) => setNewFeedUrl(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleAddFeed}
-                className="bg-ecco-navy hover:bg-ecco-navy-light"
-                disabled={addingFeedLoading || !newFeedUrl.trim()}
-              >
-                {addingFeedLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Add"
-                )}
-              </Button>
-              <Button variant="ghost" onClick={() => setIsAddingFeed(false)} disabled={addingFeedLoading}>
-                Cancel
-              </Button>
-            </div>
+
+            {newFeedType === "url" ? (
+              <div className="flex items-center gap-4">
+                <Input
+                  placeholder="Enter RSS feed URL..."
+                  value={newFeedUrl}
+                  onChange={(e) => setNewFeedUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleAddFeed}
+                  className="bg-ecco-navy hover:bg-ecco-navy-light"
+                  disabled={addingFeedLoading || !newFeedUrl.trim()}
+                >
+                  {addingFeedLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Add"
+                  )}
+                </Button>
+                <Button variant="ghost" onClick={() => setIsAddingFeed(false)} disabled={addingFeedLoading}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <Input
+                    placeholder="Enter keywords (e.g., AI, machine learning, startup)"
+                    value={newFeedKeywords}
+                    onChange={(e) => setNewFeedKeywords(e.target.value)}
+                    className="flex-1"
+                  />
+                  <p className="text-xs text-ecco-muted mt-1.5">
+                    We&apos;ll search for articles matching these keywords from popular sources
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button
+                    onClick={handleAddFeed}
+                    className="bg-ecco-navy hover:bg-ecco-navy-light"
+                    disabled={addingFeedLoading || !newFeedKeywords.trim()}
+                  >
+                    {addingFeedLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setIsAddingFeed(false)} disabled={addingFeedLoading}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -366,9 +451,16 @@ export default function FeedsPage() {
                     <Badge variant="secondary" className="text-xs">
                       {articleCounts[feed.id] || 0} articles
                     </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {feed.feed_type === "keyword" ? (
+                        <><Search className="h-3 w-3 mr-1" />Keywords</>
+                      ) : (
+                        <><Link2 className="h-3 w-3 mr-1" />URL</>
+                      )}
+                    </Badge>
                   </div>
                   <p className="text-xs text-ecco-tertiary truncate">
-                    {feed.url}
+                    {feed.feed_type === "keyword" ? `Keywords: ${feed.keywords}` : feed.url}
                   </p>
                   <p className="text-xs text-ecco-muted mt-0.5">
                     Last fetched: {formatLastFetched(feed.last_fetched_at)}
