@@ -23,7 +23,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDistanceToNow } from "@/lib/utils";
 
 // Admin email whitelist
-const ADMIN_EMAILS = ["aujena.dpree@gmail.com"];
+const ADMIN_EMAILS = ["aujena.dupree@gmail.com"];
 
 interface UserStats {
   id: string;
