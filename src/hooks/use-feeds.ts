@@ -60,10 +60,15 @@ export function useFeeds() {
   };
 
   const updateFeed = async (id: string, updates: FeedUpdate) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    // Only update if the feed belongs to the current user
     const { data, error } = await supabase
       .from("feeds")
       .update(updates)
       .eq("id", id)
+      .eq("user_id", user.id) // Security: ensure user owns this feed
       .select()
       .single();
 
@@ -78,10 +83,15 @@ export function useFeeds() {
   };
 
   const deleteFeed = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    // Only delete if the feed belongs to the current user
     const { error } = await supabase
       .from("feeds")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id); // Security: ensure user owns this feed
 
     if (error) {
       return { error: error.message };

@@ -65,10 +65,15 @@ export function usePosts(status?: "draft" | "scheduled" | "published") {
   };
 
   const updatePost = async (id: string, updates: PostUpdate) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    // Only update if the post belongs to the current user
     const { data, error } = await supabase
       .from("posts")
       .update(updates)
       .eq("id", id)
+      .eq("user_id", user.id) // Security: ensure user owns this post
       .select()
       .single();
 
@@ -83,10 +88,15 @@ export function usePosts(status?: "draft" | "scheduled" | "published") {
   };
 
   const deletePost = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    // Only delete if the post belongs to the current user
     const { error } = await supabase
       .from("posts")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id); // Security: ensure user owns this post
 
     if (error) {
       return { error: error.message };

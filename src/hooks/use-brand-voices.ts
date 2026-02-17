@@ -59,10 +59,15 @@ export function useBrandVoices() {
   };
 
   const updateBrandVoice = async (id: string, updates: BrandVoiceUpdate) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    // Only update if the voice belongs to the current user
     const { data, error } = await supabase
       .from("brand_voices")
       .update(updates)
       .eq("id", id)
+      .eq("user_id", user.id) // Security: ensure user owns this voice
       .select()
       .single();
 
@@ -77,10 +82,15 @@ export function useBrandVoices() {
   };
 
   const deleteBrandVoice = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    // Only delete if the voice belongs to the current user
     const { error } = await supabase
       .from("brand_voices")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id); // Security: ensure user owns this voice
 
     if (error) {
       return { error: error.message };

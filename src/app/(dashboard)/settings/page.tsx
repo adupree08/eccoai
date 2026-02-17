@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,10 +19,12 @@ import {
   Sparkles,
   Check,
   Trash2,
-  Edit3,
   Star,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/use-user";
+import { createClient } from "@/lib/supabase/client";
 
 interface VoiceGuideline {
   id: string;
@@ -88,12 +91,22 @@ const initialSavedVoices: BrandVoice[] = [
 const categories = ["Tone", "Structure", "Content", "Style"];
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user } = useUser();
+  const supabase = createClient();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState("brand-voice");
   const [savedVoices, setSavedVoices] = useState<BrandVoice[]>(initialSavedVoices);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>("1");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newVoiceName, setNewVoiceName] = useState("");
   const [newVoiceDescription, setNewVoiceDescription] = useState("");
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   // Current voice being edited
   const currentVoice = savedVoices.find((v) => v.id === selectedVoiceId);
@@ -746,7 +759,7 @@ export default function SettingsPage() {
                   <label className="text-sm font-medium text-ecco-secondary mb-2 block">
                     Full Name
                   </label>
-                  <Input placeholder="Your name" defaultValue="John Doe" />
+                  <Input placeholder="Your name" defaultValue={user?.user_metadata?.full_name || ""} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-ecco-secondary mb-2 block">
@@ -755,7 +768,9 @@ export default function SettingsPage() {
                   <Input
                     type="email"
                     placeholder="your@email.com"
-                    defaultValue="john@example.com"
+                    value={user?.email || ""}
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
               </div>
@@ -765,9 +780,40 @@ export default function SettingsPage() {
                 </label>
                 <Input
                   placeholder="https://linkedin.com/in/yourprofile"
-                  defaultValue="https://linkedin.com/in/johndoe"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Logout Section */}
+          <Card className="border-ecco border-red-200">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold text-ecco-primary">
+                Sign Out
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-ecco-tertiary mb-4">
+                Sign out of your eccoai account on this device.
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                {isLoggingOut ? (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4 animate-spin" />
+                    Signing out...
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
 
