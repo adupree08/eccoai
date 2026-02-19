@@ -41,6 +41,9 @@ export async function POST(request: Request) {
       viralMode = false,
       viralAngle = null,
       engagementGoal = null,
+      // Edit mode options
+      editAction = null,
+      customInstruction = null,
     } = body;
 
     // Fetch brand voice if provided
@@ -98,6 +101,19 @@ export async function POST(request: Request) {
       if (userAngle && userAngle.trim()) {
         sourceContext += `\n\nThe user wants to make this point or take this angle in their comment:\n"${userAngle}"`;
       }
+    } else if (sourceType === "edit") {
+      // Handle AI-assisted editing of existing content
+      const editActionPrompts: Record<string, string> = {
+        shorten: "Make this post more concise while keeping the key message. Remove filler words and unnecessary sentences.",
+        add_hook: "Add a compelling, attention-grabbing opening hook to this post. The hook should stop the scroll and make people want to read more.",
+        professional: "Rewrite this post to sound more professional and authoritative while keeping the core message.",
+        emojis: "Add relevant emojis throughout the post to make it more engaging and visually appealing. Don't overdo it - use them strategically.",
+        add_cta: "Add a clear call-to-action at the end of this post. It could be a question to spark discussion, an invitation to connect, or asking for people's thoughts.",
+        custom: customInstruction || "Improve this post.",
+      };
+
+      const editInstruction = editActionPrompts[editAction] || editActionPrompts.custom;
+      sourceContext = `Edit and improve this existing LinkedIn post based on the following instruction:\n\nINSTRUCTION: ${editInstruction}\n\n--- ORIGINAL POST ---\n${content}\n--- END OF POST ---\n\nReturn ONLY the edited post content. Keep the same general structure and message unless the instruction specifically asks for changes.`;
     }
 
     // Length guidance
@@ -114,8 +130,22 @@ export async function POST(request: Request) {
     }
 
     let userPrompt = "";
+    const isEdit = sourceType === "edit";
 
-    if (isComment) {
+    if (isEdit) {
+      userPrompt = `${sourceContext}
+
+IMPORTANT: Return your response as valid JSON in this exact format:
+{
+  "posts": [
+    {
+      "content": "The edited post content here",
+      "hook": "The opening line",
+      "approach": "Edited version"
+    }
+  ]
+}`;
+    } else if (isComment) {
       userPrompt = `${sourceContext}
 
 ${lengthGuidance}

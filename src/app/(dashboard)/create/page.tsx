@@ -313,6 +313,82 @@ function CreatePostContent() {
     setEditContent("");
   };
 
+  const [isApplyingAiEdit, setIsApplyingAiEdit] = useState(false);
+
+  const handleAiEditAction = async (action: string) => {
+    if (!editContent.trim() || isApplyingAiEdit) return;
+
+    setIsApplyingAiEdit(true);
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceType: "edit",
+          content: editContent,
+          editAction: action,
+          format: selectedFormat !== "None" ? selectedFormat : null,
+          tones: selectedTones.filter(t => t !== "None"),
+          brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to apply edit");
+      }
+
+      if (data.posts && data.posts.length > 0) {
+        setEditContent(data.posts[0].content);
+        toast.success(`Applied: ${action.replace("_", " ")}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to apply AI edit";
+      toast.error(message);
+    } finally {
+      setIsApplyingAiEdit(false);
+    }
+  };
+
+  const handleAiChatEdit = async () => {
+    if (!aiChatInput.trim() || !editContent.trim() || isApplyingAiEdit) return;
+
+    setIsApplyingAiEdit(true);
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceType: "edit",
+          content: editContent,
+          editAction: "custom",
+          customInstruction: aiChatInput,
+          format: selectedFormat !== "None" ? selectedFormat : null,
+          tones: selectedTones.filter(t => t !== "None"),
+          brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to apply edit");
+      }
+
+      if (data.posts && data.posts.length > 0) {
+        setEditContent(data.posts[0].content);
+        setAiChatInput("");
+        toast.success("Edit applied!");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to apply AI edit";
+      toast.error(message);
+    } finally {
+      setIsApplyingAiEdit(false);
+    }
+  };
+
   const handleSaveDraft = async (post: GeneratedPost) => {
     setSavingPostId(post.id);
     try {
@@ -787,13 +863,20 @@ function CreatePostContent() {
                           {/* AI Quick Actions */}
                           <div className="space-y-3">
                             <p className="text-xs font-medium text-ecco-tertiary">
-                              AI Suggestions
+                              AI Suggestions {isApplyingAiEdit && <Loader2 className="inline h-3 w-3 ml-1 animate-spin" />}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {aiActions.map((action) => (
                                 <button
                                   key={action.action}
-                                  className="px-3 py-1.5 text-xs font-medium rounded-full bg-ecco-accent-light text-ecco-accent hover:bg-ecco-accent hover:text-white transition-colors"
+                                  onClick={() => handleAiEditAction(action.action)}
+                                  disabled={isApplyingAiEdit}
+                                  className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
+                                    isApplyingAiEdit
+                                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                      : "bg-ecco-accent-light text-ecco-accent hover:bg-ecco-accent hover:text-white cursor-pointer"
+                                  )}
                                 >
                                   {action.label}
                                 </button>
@@ -803,22 +886,46 @@ function CreatePostContent() {
 
                           {/* AI Chat */}
                           <div className="space-y-2">
-                            <Input
-                              placeholder="Ask AI to make specific changes..."
-                              value={aiChatInput}
-                              onChange={(e) => setAiChatInput(e.target.value)}
-                              className="text-sm"
-                            />
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Ask AI to make specific changes..."
+                                value={aiChatInput}
+                                onChange={(e) => setAiChatInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleAiChatEdit()}
+                                className="text-sm flex-1"
+                                disabled={isApplyingAiEdit}
+                              />
+                              <Button
+                                size="sm"
+                                onClick={handleAiChatEdit}
+                                disabled={!aiChatInput.trim() || isApplyingAiEdit}
+                                className="bg-ecco-accent hover:bg-ecco-accent/90"
+                              >
+                                {isApplyingAiEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
+                              </Button>
+                            </div>
                             <div className="flex flex-wrap gap-1.5">
-                              <span className="px-2.5 py-1 text-[10px] rounded-full bg-ecco-accent-light text-ecco-accent cursor-pointer hover:bg-ecco-accent hover:text-white">
+                              <button
+                                onClick={() => setAiChatInput("Add a personal anecdote")}
+                                disabled={isApplyingAiEdit}
+                                className="px-2.5 py-1 text-[10px] rounded-full bg-ecco-accent-light text-ecco-accent cursor-pointer hover:bg-ecco-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
                                 Add a personal anecdote
-                              </span>
-                              <span className="px-2.5 py-1 text-[10px] rounded-full bg-ecco-accent-light text-ecco-accent cursor-pointer hover:bg-ecco-accent hover:text-white">
+                              </button>
+                              <button
+                                onClick={() => setAiChatInput("Make it more conversational")}
+                                disabled={isApplyingAiEdit}
+                                className="px-2.5 py-1 text-[10px] rounded-full bg-ecco-accent-light text-ecco-accent cursor-pointer hover:bg-ecco-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
                                 Make it more conversational
-                              </span>
-                              <span className="px-2.5 py-1 text-[10px] rounded-full bg-ecco-accent-light text-ecco-accent cursor-pointer hover:bg-ecco-accent hover:text-white">
+                              </button>
+                              <button
+                                onClick={() => setAiChatInput("Add statistics")}
+                                disabled={isApplyingAiEdit}
+                                className="px-2.5 py-1 text-[10px] rounded-full bg-ecco-accent-light text-ecco-accent cursor-pointer hover:bg-ecco-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
                                 Add statistics
-                              </span>
+                              </button>
                             </div>
                           </div>
 
