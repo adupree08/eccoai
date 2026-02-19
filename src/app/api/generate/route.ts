@@ -37,6 +37,10 @@ export async function POST(request: Request) {
       angles,
       brandVoiceId,
       length = "Medium",
+      // Viral mode options
+      viralMode = false,
+      viralAngle = null,
+      engagementGoal = null,
     } = body;
 
     // Fetch brand voice if provided
@@ -60,12 +64,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build the complete system prompt with humanization guide + tags + brand voice
+    // Build the complete system prompt with humanization guide + tags + brand voice + viral mode
     const systemPrompt = buildSystemPrompt({
       format: format || null,
       tones: tones || [],
       angles: angles || [],
       brandVoice,
+      // Viral mode options
+      viralMode: viralMode || false,
+      viralAngle: viralAngle || null,
+      engagementGoal: engagementGoal || undefined,
     });
 
     // Build the user prompt based on source type

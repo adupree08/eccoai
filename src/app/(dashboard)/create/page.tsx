@@ -22,10 +22,16 @@ import {
   Loader2,
   ExternalLink,
   MessageCircle,
+  Zap,
+  TrendingUp,
+  MessageSquare,
+  Share2,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePosts } from "@/hooks/use-posts";
 import { useBrandVoices } from "@/hooks/use-brand-voices";
+import { toast } from "sonner";
 
 const formats = [
   "None",
@@ -71,6 +77,28 @@ const angles = [
   "Tactical",
   "I Thought I Knew",
   "Promotional",
+];
+
+// Viral mode angles - optimized for high engagement
+const viralAngles = [
+  { value: "None", label: "None", description: "No specific viral angle" },
+  { value: "Pattern-Interrupt", label: "Pattern Interrupt", description: "Break expectations, stop the scroll" },
+  { value: "Credible-Contrarian", label: "Credible Contrarian", description: "Challenge norms with evidence" },
+  { value: "Curated-Value", label: "Curated Value", description: "Save-worthy resource lists" },
+  { value: "Vulnerable-Authority", label: "Vulnerable Authority", description: "Share struggles with wisdom" },
+  { value: "Data-Driven-Emotion", label: "Data + Emotion", description: "Numbers that make people feel" },
+  { value: "Industry-Callout", label: "Industry Callout", description: "Name what others won't say" },
+  { value: "Milestone-Gratitude", label: "Milestone", description: "Celebrate with genuine reflection" },
+  { value: "Behind-The-Curtain", label: "Behind The Curtain", description: "Reveal how things actually work" },
+  { value: "Hot-Take-With-Receipts", label: "Hot Take + Proof", description: "Bold claims with evidence" },
+  { value: "Building-In-Public", label: "Building in Public", description: "Share real journey updates" },
+];
+
+const engagementGoals = [
+  { value: "viral", label: "Viral", icon: TrendingUp, description: "Maximize all engagement" },
+  { value: "comments", label: "Comments", icon: MessageSquare, description: "Drive conversation" },
+  { value: "shares", label: "Shares", icon: Share2, description: "Get saved & shared" },
+  { value: "likes", label: "Likes", icon: Heart, description: "Create emotional resonance" },
 ];
 
 const lengths = [
@@ -128,6 +156,10 @@ function CreatePostContent() {
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
   const [selectedLength, setSelectedLength] = useState("Medium");
   const [selectedBrandVoice, setSelectedBrandVoice] = useState<string>("none");
+  // Viral mode state
+  const [viralMode, setViralMode] = useState(false);
+  const [selectedViralAngle, setSelectedViralAngle] = useState<string>("None");
+  const [selectedEngagementGoal, setSelectedEngagementGoal] = useState<string>("viral");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [urlFetched, setUrlFetched] = useState<{ title: string; content: string } | null>(null);
@@ -167,11 +199,12 @@ function CreatePostContent() {
           title: data.title,
           content: data.content,
         });
+        toast.success("URL content fetched successfully");
       } else {
-        alert("Failed to fetch URL: " + data.error);
+        toast.error("Failed to fetch URL: " + data.error);
       }
     } catch {
-      alert("Failed to fetch URL content");
+      toast.error("Failed to fetch URL content");
     } finally {
       setIsFetchingUrl(false);
     }
@@ -218,6 +251,10 @@ function CreatePostContent() {
           angles: selectedAngles.filter(a => a !== "None"),
           brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
           length: activeTab === "comment" ? "Short" : selectedLength,
+          // Viral mode options
+          viralMode,
+          viralAngle: viralMode && selectedViralAngle !== "None" ? selectedViralAngle : null,
+          engagementGoal: viralMode ? selectedEngagementGoal : null,
         }),
       });
 
@@ -242,7 +279,7 @@ function CreatePostContent() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate posts";
-      alert(message);
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }
@@ -291,12 +328,13 @@ function CreatePostContent() {
       });
 
       if (result.error) {
-        alert("Failed to save draft: " + result.error);
+        toast.error("Failed to save draft: " + result.error);
       } else {
         setSavedPosts(prev => new Set(prev).add(post.id));
+        toast.success("Draft saved successfully");
       }
     } catch {
-      alert("Failed to save draft");
+      toast.error("Failed to save draft");
     } finally {
       setSavingPostId(null);
     }
@@ -324,13 +362,14 @@ function CreatePostContent() {
       });
 
       if (result.error) {
-        alert("Failed to schedule post: " + result.error);
+        toast.error("Failed to schedule post: " + result.error);
       } else {
         setSavedPosts(prev => new Set(prev).add(post.id));
+        toast.success("Post scheduled for tomorrow at 9 AM");
         router.push("/library?filter=scheduled");
       }
     } catch {
-      alert("Failed to schedule post");
+      toast.error("Failed to schedule post");
     } finally {
       setSavingPostId(null);
     }
@@ -888,6 +927,91 @@ function CreatePostContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Viral Mode Toggle */}
+                <div className="pb-4 border-b border-ecco-light">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className={cn("h-5 w-5", viralMode ? "text-amber-500 fill-amber-500" : "text-amber-400")} />
+                      <p className="text-sm font-semibold text-ecco-blue">
+                        Viral Mode
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setViralMode(!viralMode)}
+                      className={cn(
+                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                        viralMode ? "bg-amber-500" : "bg-gray-200"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                          viralMode ? "translate-x-6" : "translate-x-1"
+                        )}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-ecco-muted">
+                    Optimize for maximum LinkedIn engagement
+                  </p>
+
+                  {/* Viral Mode Options */}
+                  {viralMode && (
+                    <div className="mt-4 space-y-4">
+                      {/* Engagement Goal */}
+                      <div>
+                        <p className="text-xs font-medium text-ecco-secondary mb-2">
+                          Optimize for
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {engagementGoals.map((goal) => {
+                            const Icon = goal.icon;
+                            const isSelected = selectedEngagementGoal === goal.value;
+                            return (
+                              <button
+                                key={goal.value}
+                                onClick={() => setSelectedEngagementGoal(goal.value)}
+                                className={cn(
+                                  "flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors",
+                                  isSelected
+                                    ? "bg-amber-50 border-amber-500 text-amber-700"
+                                    : "bg-white border-gray-200 text-ecco-tertiary hover:border-amber-300"
+                                )}
+                              >
+                                <Icon className={cn("h-3.5 w-3.5", isSelected ? "text-amber-500" : "")} />
+                                <span className="text-xs font-medium">{goal.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Viral Angle Selection */}
+                      <div>
+                        <p className="text-xs font-medium text-ecco-secondary mb-2">
+                          Viral Angle
+                        </p>
+                        <select
+                          value={selectedViralAngle}
+                          onChange={(e) => setSelectedViralAngle(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-amber-200 rounded-lg bg-amber-50 text-ecco-primary"
+                        >
+                          {viralAngles.map((angle) => (
+                            <option key={angle.value} value={angle.value}>
+                              {angle.label}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedViralAngle !== "None" && (
+                          <p className="text-[10px] text-amber-600 mt-1.5">
+                            {viralAngles.find(a => a.value === selectedViralAngle)?.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Format Selection - Single Select */}
                 <div>
                   <p className="text-sm font-semibold text-ecco-blue mb-1">

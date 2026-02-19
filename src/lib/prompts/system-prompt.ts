@@ -1,5 +1,14 @@
 // Master System Prompt - Applied to ALL content generation
 // Based on AI-Content-Humanization-Guide.md
+// Viral Framework integration available via viral-framework.ts
+
+import {
+  VIRAL_SYSTEM_PROMPT,
+  VIRAL_ANGLE_TAGS,
+  VIRAL_CONFLICTS,
+  buildViralPrompt,
+  ENGAGEMENT_RULES
+} from './viral-framework';
 
 export const MASTER_SYSTEM_PROMPT = `VOICE & TONE RULES:
 - Write like a smart, experienced friend who happens to know a lot about this topic. Not a textbook. Not a brand mascot. A real person.
@@ -159,8 +168,21 @@ export function buildSystemPrompt(options: {
     preferredTerms: string[];
     samples: string[];
   } | null;
+  // Viral mode options
+  viralMode?: boolean;
+  viralAngle?: string | null;
+  engagementGoal?: "comments" | "shares" | "likes" | "viral";
 }): string {
   const parts: string[] = [MASTER_SYSTEM_PROMPT];
+
+  // Add viral framework if enabled
+  if (options.viralMode) {
+    const viralPrompt = buildViralPrompt({
+      viralAngle: options.viralAngle || null,
+      engagementGoal: options.engagementGoal,
+    });
+    parts.push(`\n\n${viralPrompt}`);
+  }
 
   // Add format instruction if selected
   if (options.format && options.format !== "None" && FORMAT_TAGS[options.format]) {
@@ -220,3 +242,20 @@ export function buildSystemPrompt(options: {
 
   return parts.join("");
 }
+
+// Re-export viral framework components for use in other modules
+export {
+  VIRAL_SYSTEM_PROMPT,
+  VIRAL_ANGLE_TAGS,
+  VIRAL_CONFLICTS,
+  ENGAGEMENT_RULES,
+  buildViralPrompt,
+} from './viral-framework';
+
+export {
+  VIRAL_ANGLE_OPTIONS,
+  VIRAL_HOOK_CATEGORIES,
+  getViralHookExamples,
+  getViralExample,
+  getAllViralExamples,
+} from './viral-framework';
