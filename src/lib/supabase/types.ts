@@ -149,6 +149,96 @@ export interface Database {
           fetched_at?: string;
         };
       };
+      feedback: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: "feedback" | "bug" | "feature";
+          message: string;
+          status: "new" | "reviewed" | "resolved";
+          admin_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type?: "feedback" | "bug" | "feature";
+          message: string;
+          status?: "new" | "reviewed" | "resolved";
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: "feedback" | "bug" | "feature";
+          message?: string;
+          status?: "new" | "reviewed" | "resolved";
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      saved_articles: {
+        Row: {
+          id: string;
+          user_id: string;
+          article_id: string;
+          feed_id: string;
+          title: string;
+          snippet: string | null;
+          url: string;
+          author: string | null;
+          published_at: string | null;
+          saved_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          article_id: string;
+          feed_id: string;
+          title: string;
+          snippet?: string | null;
+          url: string;
+          author?: string | null;
+          published_at?: string | null;
+          saved_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          article_id?: string;
+          feed_id?: string;
+          title?: string;
+          snippet?: string | null;
+          url?: string;
+          author?: string | null;
+          published_at?: string | null;
+          saved_at?: string;
+        };
+      };
+      hidden_articles: {
+        Row: {
+          id: string;
+          user_id: string;
+          article_id: string;
+          hidden_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          article_id: string;
+          hidden_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          article_id?: string;
+          hidden_at?: string;
+        };
+      };
       posts: {
         Row: {
           id: string;

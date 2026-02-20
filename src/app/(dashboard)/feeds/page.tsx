@@ -27,10 +27,14 @@ import {
   Rss,
   Search,
   Link2,
+  Bookmark,
+  BookmarkCheck,
+  EyeOff,
 } from "lucide-react";
 import { useFeeds } from "@/hooks/use-feeds";
 import { createClient } from "@/lib/supabase/client";
 import { formatDistanceToNow } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Article {
   id: string;
@@ -40,6 +44,19 @@ interface Article {
   url: string;
   author: string | null;
   published_at: string | null;
+}
+
+interface SavedArticle {
+  id: string;
+  user_id: string;
+  article_id: string;
+  feed_id: string;
+  title: string;
+  snippet: string | null;
+  url: string;
+  author: string | null;
+  published_at: string | null;
+  saved_at: string;
 }
 
 export default function FeedsPage() {
@@ -57,6 +74,11 @@ export default function FeedsPage() {
   const [editingFeedId, setEditingFeedId] = useState<string | null>(null);
   const [editingFeedName, setEditingFeedName] = useState("");
   const [articleCounts, setArticleCounts] = useState<Record<string, number>>({});
+  const [activeView, setActiveView] = useState<"feeds" | "saved">("feeds");
+  const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
+  const [savedArticleIds, setSavedArticleIds] = useState<Set<string>>(new Set());
+  const [hiddenArticleIds, setHiddenArticleIds] = useState<Set<string>>(new Set());
+  const [loadingSavedArticles, setLoadingSavedArticles] = useState(false);
 
   const supabase = createClient();
 
@@ -78,6 +100,101 @@ export default function FeedsPage() {
   useEffect(() => {
     fetchArticleCounts();
   }, [fetchArticleCounts]);
+
+  // Fetch saved articles
+  const fetchSavedArticles = useCallback(async () => {
+    setLoadingSavedArticles(true);
+    const { data } = await supabase
+      .from("saved_articles")
+      .select("*")
+      .order("saved_at", { ascending: false });
+
+    if (data) {
+      setSavedArticles(data as SavedArticle[]);
+      setSavedArticleIds(new Set(data.map((a: SavedArticle) => a.article_id)));
+    }
+    setLoadingSavedArticles(false);
+  }, [supabase]);
+
+  // Fetch hidden article IDs
+  const fetchHiddenArticles = useCallback(async () => {
+    const { data } = await supabase
+      .from("hidden_articles")
+      .select("article_id");
+
+    if (data) {
+      setHiddenArticleIds(new Set(data.map((a: { article_id: string }) => a.article_id)));
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchSavedArticles();
+    fetchHiddenArticles();
+  }, [fetchSavedArticles, fetchHiddenArticles]);
+
+  // Save article for later
+  const saveArticle = async (article: Article, feedId: string) => {
+    const { error } = await supabase.from("saved_articles").insert({
+      article_id: article.id,
+      feed_id: feedId,
+      title: article.title,
+      snippet: article.snippet,
+      url: article.url,
+      author: article.author,
+      published_at: article.published_at,
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("Article already saved");
+      } else {
+        toast.error("Failed to save article");
+      }
+    } else {
+      toast.success("Article saved for later");
+      setSavedArticleIds(prev => new Set(prev).add(article.id));
+      fetchSavedArticles();
+    }
+  };
+
+  // Remove saved article
+  const unsaveArticle = async (articleId: string) => {
+    const { error } = await supabase
+      .from("saved_articles")
+      .delete()
+      .eq("article_id", articleId);
+
+    if (error) {
+      toast.error("Failed to remove saved article");
+    } else {
+      toast.success("Article removed from saved");
+      setSavedArticleIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(articleId);
+        return newSet;
+      });
+      setSavedArticles(prev => prev.filter(a => a.article_id !== articleId));
+    }
+  };
+
+  // Hide article from feed
+  const hideArticle = async (articleId: string) => {
+    const { error } = await supabase.from("hidden_articles").insert({
+      article_id: articleId,
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        // Already hidden, just update local state
+        setHiddenArticleIds(prev => new Set(prev).add(articleId));
+      } else {
+        toast.error("Failed to hide article");
+      }
+    } else {
+      toast.success("Article hidden from feed");
+      setHiddenArticleIds(prev => new Set(prev).add(articleId));
+    }
+  };
 
   const toggleFeedExpand = async (feedId: string) => {
     const newExpanded = new Set(expandedFeeds);
@@ -147,7 +264,7 @@ export default function FeedsPage() {
     const result = await createFeed(feedData);
 
     if (result.error) {
-      alert("Failed to add feed: " + result.error);
+      toast.error("Failed to add feed: " + result.error);
       setAddingFeedLoading(false);
       return;
     }
@@ -180,8 +297,9 @@ export default function FeedsPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert("Failed to refresh feed: " + data.error);
+        toast.error("Failed to refresh feed: " + data.error);
       } else {
+        toast.success("Feed refreshed successfully");
         // Refetch feeds to get updated name/timestamp
         await refetch();
         // Refetch articles for this feed
@@ -194,7 +312,7 @@ export default function FeedsPage() {
         setArticleCounts(prev => ({ ...prev, [feedId]: count || 0 }));
       }
     } catch {
-      alert("Failed to refresh feed");
+      toast.error("Failed to refresh feed");
     } finally {
       setRefreshingFeeds(prev => {
         const newSet = new Set(prev);
@@ -284,6 +402,137 @@ export default function FeedsPage() {
         </Button>
       </div>
 
+      {/* View Toggle */}
+      <div className="flex gap-2 border-b border-ecco-light">
+        <button
+          onClick={() => setActiveView("feeds")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeView === "feeds"
+              ? "border-ecco-navy text-ecco-navy"
+              : "border-transparent text-ecco-tertiary hover:text-ecco-primary"
+          }`}
+        >
+          <Rss className="inline-block mr-2 h-4 w-4" />
+          My Feeds
+        </button>
+        <button
+          onClick={() => setActiveView("saved")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeView === "saved"
+              ? "border-ecco-navy text-ecco-navy"
+              : "border-transparent text-ecco-tertiary hover:text-ecco-primary"
+          }`}
+        >
+          <Bookmark className="inline-block mr-2 h-4 w-4" />
+          Saved for Later
+          {savedArticles.length > 0 && (
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {savedArticles.length}
+            </Badge>
+          )}
+        </button>
+      </div>
+
+      {/* Saved Articles View */}
+      {activeView === "saved" && (
+        <div className="space-y-4">
+          {loadingSavedArticles ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
+            </div>
+          ) : savedArticles.length === 0 ? (
+            <Card className="border-ecco border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ecco-accent-light">
+                  <Bookmark className="h-6 w-6 text-ecco-accent" />
+                </div>
+                <h3 className="text-base font-semibold text-ecco-primary">
+                  No saved articles yet
+                </h3>
+                <p className="mt-1 text-sm text-ecco-tertiary text-center max-w-md">
+                  Save articles from your feeds to read or create posts from later. Click the bookmark icon on any article to save it.
+                </p>
+                <Button
+                  onClick={() => setActiveView("feeds")}
+                  className="mt-4 bg-ecco-navy hover:bg-ecco-navy-light"
+                >
+                  <Rss className="mr-2 h-4 w-4" />
+                  Browse Feeds
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {savedArticles.map((article) => (
+                <Card key={article.id} className="border-ecco">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="text-sm font-semibold text-ecco-primary line-clamp-2 flex-1">
+                        {article.title}
+                      </h4>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 shrink-0 text-ecco-muted hover:text-ecco-error"
+                        onClick={() => unsaveArticle(article.article_id)}
+                        title="Remove from saved"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {article.snippet && (
+                      <p className="text-xs text-ecco-tertiary mb-3 line-clamp-2">
+                        {article.snippet}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between mb-3">
+                      {article.published_at && (
+                        <p className="text-xs text-ecco-muted">
+                          {formatLastFetched(article.published_at)}
+                        </p>
+                      )}
+                      <p className="text-xs text-ecco-muted">
+                        Saved {formatLastFetched(article.saved_at)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 text-xs"
+                        onClick={() => window.open(article.url, "_blank")}
+                      >
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Read
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs bg-ecco-navy hover:bg-ecco-navy-light"
+                        onClick={() => {
+                          const params = new URLSearchParams({
+                            source: "rss",
+                            title: article.title,
+                            url: article.url,
+                            content: article.snippet || "",
+                          });
+                          router.push(`/create?${params.toString()}`);
+                        }}
+                      >
+                        <Sparkles className="mr-1 h-3 w-3" />
+                        Create Post
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Feeds View */}
+      {activeView === "feeds" && (
+        <>
       {/* Add Feed Form */}
       {isAddingFeed && (
         <Card className="border-ecco border-dashed">
@@ -518,12 +767,41 @@ export default function FeedsPage() {
               <CollapsibleContent>
                 <div className="border-t border-ecco-light px-4 pb-4">
                   <div className="grid gap-4 pt-4 sm:grid-cols-2">
-                    {(feedArticles[feed.id] || []).map((article) => (
+                    {(feedArticles[feed.id] || [])
+                      .filter(article => !hiddenArticleIds.has(article.id))
+                      .map((article) => (
                       <div
                         key={article.id}
-                        className="rounded-lg border border-ecco-light p-4"
+                        className="rounded-lg border border-ecco-light p-4 relative group"
                       >
-                        <h4 className="text-sm font-semibold text-ecco-primary mb-2 line-clamp-2">
+                        {/* Save and Hide buttons */}
+                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => savedArticleIds.has(article.id)
+                              ? unsaveArticle(article.id)
+                              : saveArticle(article, feed.id)}
+                            title={savedArticleIds.has(article.id) ? "Remove from saved" : "Save for later"}
+                          >
+                            {savedArticleIds.has(article.id) ? (
+                              <BookmarkCheck className="h-4 w-4 text-ecco-accent" />
+                            ) : (
+                              <Bookmark className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-ecco-muted hover:text-ecco-error"
+                            onClick={() => hideArticle(article.id)}
+                            title="Hide from feed"
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <h4 className="text-sm font-semibold text-ecco-primary mb-2 line-clamp-2 pr-16">
                           {article.title}
                         </h4>
                         {article.snippet && (
@@ -625,6 +903,8 @@ export default function FeedsPage() {
             </Button>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   );
