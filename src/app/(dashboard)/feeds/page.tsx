@@ -775,14 +775,18 @@ export default function FeedsPage() {
                         className="rounded-lg border border-ecco-light p-4 relative group"
                       >
                         {/* Save and Hide buttons */}
-                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => savedArticleIds.has(article.id)
-                              ? unsaveArticle(article.id)
-                              : saveArticle(article, feed.id)}
+                            className="h-7 w-7 bg-white/80 hover:bg-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              savedArticleIds.has(article.id)
+                                ? unsaveArticle(article.id)
+                                : saveArticle(article, feed.id);
+                            }}
                             title={savedArticleIds.has(article.id) ? "Remove from saved" : "Save for later"}
                           >
                             {savedArticleIds.has(article.id) ? (
@@ -794,8 +798,12 @@ export default function FeedsPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7 text-ecco-muted hover:text-ecco-error"
-                            onClick={() => hideArticle(article.id)}
+                            className="h-7 w-7 bg-white/80 hover:bg-white text-ecco-muted hover:text-ecco-error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              hideArticle(article.id);
+                            }}
                             title="Hide from feed"
                           >
                             <EyeOff className="h-4 w-4" />
