@@ -37,16 +37,12 @@ export function LandingNav() {
         >
           <span
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 9,
               fontWeight: 700,
               fontSize: 20,
               letterSpacing: "-0.02em",
             }}
           >
-            <span style={{ color: "var(--ink)" }}>ecco</span>
-            <span style={{ color: "var(--accent)" }}>ai</span>
+            <span style={{ color: "var(--ink)" }}>ecco</span><span style={{ color: "var(--accent)" }}>ai</span>
           </span>
         </Link>
         <div
