@@ -45,52 +45,10 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-
-  /* eccoai custom colors */
-  --color-ecco-navy: #1E2040;
-  --color-ecco-navy-light: #2A2D55;
-  --color-ecco-purple: #4A3F6B;
-  --color-ecco-purple-light: #5E5183;
-  --color-ecco-blue: #4A7FC1;
-  --color-ecco-blue-soft: #7BA3D4;
-  --color-ecco-blue-pale: #D4E4F5;
-  --color-ecco-accent: #6366F1;
-  --color-ecco-accent-light: #EEF2FF;
-  --color-ecco-success: #22C55E;
-  --color-ecco-warning: #F59E0B;
-  --color-ecco-error: #EF4444;
 }
 
 :root {
   --radius: 0.625rem;
-
-  /* eccoai Brand Colors - Purple Blue Merge */
-  --ecco-navy: #1E2040;
-  --ecco-navy-light: #2A2D55;
-  --ecco-purple: #4A3F6B;
-  --ecco-purple-light: #5E5183;
-  --ecco-blue: #4A7FC1;
-  --ecco-blue-soft: #7BA3D4;
-  --ecco-blue-pale: #D4E4F5;
-  --ecco-accent: #6366F1;
-  --ecco-accent-light: #EEF2FF;
-
-  /* Semantic Colors */
-  --ecco-success: #22C55E;
-  --ecco-warning: #F59E0B;
-  --ecco-error: #EF4444;
-
-  /* Text Colors */
-  --ecco-text-primary: #1E2040;
-  --ecco-text-secondary: #3A3855;
-  --ecco-text-tertiary: #6B6A80;
-  --ecco-text-muted: #9E9DB0;
-
-  /* Background & Surface */
-  --ecco-white: #FFFFFF;
-  --ecco-off-white: #F9F9FB;
-  --ecco-border: #E2E1E9;
-  --ecco-border-light: #EEEEF3;
 
   /* shadcn/ui theme variables */
   --background: oklch(0.99 0.002 280);
@@ -170,101 +128,26 @@
   }
 }
 
-/* Custom utility classes for eccoai */
-@layer utilities {
-  .text-ecco-primary { color: var(--ecco-text-primary); }
-  .text-ecco-secondary { color: var(--ecco-text-secondary); }
-  .text-ecco-tertiary { color: var(--ecco-text-tertiary); }
-  .text-ecco-muted { color: var(--ecco-text-muted); }
-
-  .bg-ecco-navy { background-color: var(--ecco-navy); }
-  .bg-ecco-navy-light { background-color: var(--ecco-navy-light); }
-  .bg-ecco-purple { background-color: var(--ecco-purple); }
-  .bg-ecco-purple-light { background-color: var(--ecco-purple-light); }
-  .bg-ecco-blue { background-color: var(--ecco-blue); }
-  .bg-ecco-blue-soft { background-color: var(--ecco-blue-soft); }
-  .bg-ecco-blue-pale { background-color: var(--ecco-blue-pale); }
-  .bg-ecco-accent { background-color: var(--ecco-accent); }
-  .bg-ecco-accent-light { background-color: var(--ecco-accent-light); }
-  .bg-ecco-off-white { background-color: var(--ecco-off-white); }
-
-  .border-ecco { border-color: var(--ecco-border); }
-  .border-ecco-light { border-color: var(--ecco-border-light); }
-
-  /* Gradient backgrounds */
-  .bg-ecco-gradient {
-    background: linear-gradient(135deg, var(--ecco-navy), var(--ecco-purple));
-  }
-
-  .bg-ecco-gradient-soft {
-    background: linear-gradient(135deg, var(--ecco-blue), var(--ecco-purple-light));
-  }
-}
-
 /* ============================================================
-   LANDING PAGE THEME SYSTEM
-   Three aesthetic directions, scoped to [data-theme] wrapper.
-   These do NOT affect the dashboard.
+   LANDING PAGE THEME — single ecco theme
    ============================================================ */
 
-[data-theme="signal"] {
-  --bg: #f6f5f1;
-  --bg-2: #efede7;
-  --ink: #14110e;
-  --ink-2: #44413c;
-  --ink-3: #8a877f;
-  --line: #1411101a;
-  --line-strong: #14111033;
-  --accent: #2f40ff;
+[data-theme="ecco"] {
+  --bg: #ffffff;
+  --bg-2: #f7f7f5;
+  --bg-3: #eeeeea;
+  --ink: #0b0b0c;
+  --ink-2: #3a3a3d;
+  --ink-3: #6b6b70;
+  --line: #0b0b0c14;
+  --line-strong: #0b0b0c24;
+  --accent: #0a66c2;
   --accent-ink: #ffffff;
   --card: #ffffff;
-  --font-display: "Inter Tight", ui-sans-serif, sans-serif;
-  --font-body: "Inter Tight", ui-sans-serif, sans-serif;
+  --font-sans: "Inter Tight", ui-sans-serif, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --display-tracking: -0.035em;
-  --display-weight: 500;
-  --radius: 10px;
-  --radius-lg: 16px;
-}
-
-[data-theme="chorus"] {
-  --bg: #f4ecdf;
-  --bg-2: #eee2cf;
-  --ink: #1a1410;
-  --ink-2: #4a3d32;
-  --ink-3: #8a7b6c;
-  --line: #1a141022;
-  --line-strong: #1a141044;
-  --accent: #ff4b2e;
-  --accent-ink: #fff8ec;
-  --card: #fffaf0;
-  --font-display: "Fraunces", "Instrument Serif", serif;
-  --font-body: "DM Sans", ui-sans-serif, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --display-tracking: -0.03em;
-  --display-weight: 700;
-  --radius: 14px;
-  --radius-lg: 22px;
-}
-
-[data-theme="broadsheet"] {
-  --bg: #0e0d0b;
-  --bg-2: #17160f;
-  --ink: #f2ede1;
-  --ink-2: #c9c2b1;
-  --ink-3: #807a6a;
-  --line: #f2ede121;
-  --line-strong: #f2ede140;
-  --accent: #e8c15a;
-  --accent-ink: #0e0d0b;
-  --card: #1a1812;
-  --font-display: "Instrument Serif", "Fraunces", serif;
-  --font-body: "Inter Tight", ui-sans-serif, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --display-tracking: -0.01em;
-  --display-weight: 400;
-  --radius: 4px;
-  --radius-lg: 6px;
+  --radius: 12px;
+  --radius-lg: 18px;
 }
 
 /* Landing page utility classes */

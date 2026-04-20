@@ -9,34 +9,23 @@ const navLink: React.CSSProperties = {
   fontWeight: 500,
 };
 
-interface LandingNavProps {
-  theme: string;
-  onCycleTheme: () => void;
-}
-
-const themeLabels: Record<string, string> = {
-  signal: "Signal",
-  chorus: "Chorus",
-  broadsheet: "Broadsheet",
-};
-
-export function LandingNav({ theme, onCycleTheme }: LandingNavProps) {
+export function LandingNav() {
   return (
     <nav
       style={{
         position: "sticky",
         top: 0,
-        zIndex: 20,
-        background: "color-mix(in oklab, var(--bg) 88%, transparent)",
-        backdropFilter: "blur(12px)",
+        zIndex: 30,
+        background: "color-mix(in oklab, var(--bg) 92%, transparent)",
+        backdropFilter: "blur(10px)",
         borderBottom: "1px solid var(--line)",
       }}
     >
       <div
         style={{
-          maxWidth: 1240,
+          maxWidth: 1200,
           margin: "0 auto",
-          padding: "14px 28px",
+          padding: "16px 28px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -53,6 +42,7 @@ export function LandingNav({ theme, onCycleTheme }: LandingNavProps) {
               gap: 9,
               fontWeight: 700,
               fontSize: 20,
+              letterSpacing: "-0.02em",
             }}
           >
             <span style={{ color: "var(--ink)" }}>ecco</span>
@@ -63,60 +53,38 @@ export function LandingNav({ theme, onCycleTheme }: LandingNavProps) {
           className="landing-nav-links"
           style={{ display: "flex", alignItems: "center", gap: 28 }}
         >
-          <a href="#demo" style={navLink}>
-            Try it
+          <a href="#features" style={navLink}>
+            Features
           </a>
-          <a href="#examples" style={navLink}>
-            Examples
+          <a href="#how" style={navLink}>
+            How It Works
           </a>
-          <a href="#waitlist" style={navLink}>
-            Waitlist
+          <a href="#use-cases" style={navLink}>
+            Use Cases
           </a>
-          <button
-            onClick={onCycleTheme}
-            title="Cycle aesthetic"
-            style={{
-              ...navLink,
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: ".14em",
-              border: "1px solid var(--line-strong)",
-              padding: "7px 12px",
-              borderRadius: 999,
-              cursor: "pointer",
-              background: "none",
-            }}
-          >
-            ◐ {themeLabels[theme] || "Signal"}
-          </button>
-          <Link
-            href="/login"
-            style={{ ...navLink, marginRight: -8 }}
-          >
+          <Link href="/login" style={navLink}>
             Login
           </Link>
-          <Link
-            href="/signup"
+          <a
+            href="#signup"
             style={{
-              background: "var(--ink)",
-              color: "var(--bg)",
-              padding: "10px 16px",
-              borderRadius: "var(--radius)",
+              background: "var(--accent)",
+              color: "#fff",
+              padding: "10px 18px",
+              borderRadius: 999,
               textDecoration: "none",
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
               whiteSpace: "nowrap",
             }}
           >
-            Join beta
-          </Link>
+            Join Beta
+          </a>
         </div>
       </div>
       <style>{`
-        @media (max-width: 720px) {
-          .landing-nav-links a:not(:last-child):not([href="#waitlist"]) { display: none; }
-          .landing-nav-links button { display: none; }
+        @media (max-width: 760px) {
+          .landing-nav-links a:not([href="#signup"]) { display: none; }
         }
       `}</style>
     </nav>

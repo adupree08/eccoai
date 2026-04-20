@@ -3,62 +3,49 @@
 import { useState } from "react";
 import Link from "next/link";
 
+const BLUE = "var(--accent)";
+
 export function LandingCTA() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
 
   return (
-    <section id="waitlist" style={{ maxWidth: 1240, margin: "0 auto", padding: "88px 28px", paddingBottom: 120 }}>
+    <section id="signup" style={{ maxWidth: 1200, margin: "0 auto", padding: "72px 28px", paddingBottom: 120 }}>
       <div
         style={{
           background: "var(--ink)",
-          color: "var(--bg)",
-          borderRadius: "var(--radius-lg)",
-          padding: "clamp(40px, 7vw, 96px)",
+          color: "#fff",
+          borderRadius: 24,
+          padding: "clamp(40px, 7vw, 88px)",
+          textAlign: "center",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        <div
-          className="mono"
-          style={{
-            fontSize: 11,
-            textTransform: "uppercase",
-            letterSpacing: ".18em",
-            opacity: 0.55,
-            marginBottom: 24,
-          }}
-        >
-          03 — join the beta
-        </div>
-
         <h2
           style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: "var(--display-weight)",
-            letterSpacing: "var(--display-tracking)",
-            fontSize: "clamp(44px, 7vw, 96px)",
-            lineHeight: 0.98,
+            fontSize: "clamp(36px, 5.5vw, 72px)",
+            lineHeight: 1.02,
+            letterSpacing: "-0.025em",
+            fontWeight: 600,
             margin: 0,
-            maxWidth: 900,
           }}
         >
-          Sound like yourself.
+          Ready to find
           <br />
-          <span style={{ opacity: 0.55 }}>On a good day.</span>
+          your LinkedIn voice?
         </h2>
-
         <p
           style={{
-            marginTop: 28,
+            marginTop: 22,
+            fontSize: 17,
+            opacity: 0.7,
             maxWidth: 560,
-            fontSize: 18,
-            lineHeight: 1.5,
-            opacity: 0.75,
+            marginInline: "auto",
           }}
         >
-          We&apos;re adding about 40 people a week. Drop your email — if you&apos;re a fit
-          we&apos;ll send a calm, human note with access.
+          Join our beta and start creating content that sounds like you. Limited spots available for
+          early access.
         </p>
 
         {!sent ? (
@@ -68,97 +55,92 @@ export function LandingCTA() {
               if (email.includes("@")) setSent(true);
             }}
             style={{
-              marginTop: 40,
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1fr) auto",
+              marginTop: 32,
+              display: "flex",
               gap: 10,
-              maxWidth: 540,
+              flexWrap: "wrap",
+              justifyContent: "center",
+              maxWidth: 520,
+              marginInline: "auto",
             }}
           >
             <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              type="email"
               placeholder="you@domain.com"
               style={{
-                background: "transparent",
-                border: "1px solid color-mix(in oklab, var(--bg) 30%, transparent)",
-                borderRadius: "var(--radius)",
-                padding: "18px 22px",
-                fontSize: 16,
-                color: "var(--bg)",
+                flex: 1,
+                minWidth: 220,
+                background: "rgba(255,255,255,.08)",
+                border: "1px solid rgba(255,255,255,.18)",
+                borderRadius: 12,
+                padding: "16px 20px",
+                color: "#fff",
+                fontSize: 15,
               }}
             />
             <button
               type="submit"
               style={{
-                background: "var(--accent)",
-                color: "var(--accent-ink)",
-                padding: "0 26px",
-                borderRadius: "var(--radius)",
+                background: BLUE,
+                color: "#fff",
+                padding: "0 24px",
+                borderRadius: 12,
                 fontWeight: 600,
                 fontSize: 15,
                 border: "none",
                 cursor: "pointer",
               }}
             >
-              Request access →
+              Request Early Access
             </button>
           </form>
         ) : (
           <div
             style={{
-              marginTop: 40,
-              maxWidth: 540,
-              padding: "22px 24px",
-              border: "1px solid color-mix(in oklab, var(--bg) 30%, transparent)",
-              borderRadius: "var(--radius)",
-              display: "flex",
+              marginTop: 32,
+              display: "inline-flex",
               alignItems: "center",
-              gap: 12,
+              gap: 10,
+              padding: "14px 20px",
+              borderRadius: 999,
+              background: "rgba(255,255,255,.08)",
             }}
           >
             <span
-              style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--accent)" }}
+              style={{ width: 8, height: 8, borderRadius: "50%", background: BLUE }}
             />
-            <span>Got it. We&apos;ll be in touch within a week.</span>
+            Got it — we&apos;ll be in touch.
           </div>
         )}
 
-        {/* decorative echo circles */}
+        <div style={{ marginTop: 18, fontSize: 13, opacity: 0.55 }}>
+          Free during beta · No credit card required · Cancel anytime
+        </div>
+
+        {/* Decorative echo rings */}
         <div
           style={{
             position: "absolute",
-            right: -40,
-            bottom: -40,
-            width: 340,
-            height: 340,
+            right: -80,
+            top: -80,
+            width: 300,
+            height: 300,
             borderRadius: "50%",
-            border: "1px solid color-mix(in oklab, var(--bg) 15%, transparent)",
+            border: "1px solid rgba(255,255,255,.08)",
             pointerEvents: "none",
           }}
         />
         <div
           style={{
             position: "absolute",
-            right: 40,
-            bottom: 40,
+            right: -20,
+            top: -20,
             width: 180,
             height: 180,
             borderRadius: "50%",
-            border: "1px solid color-mix(in oklab, var(--bg) 25%, transparent)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            right: 110,
-            bottom: 110,
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            background: "var(--accent)",
+            border: "1px solid rgba(255,255,255,.12)",
             pointerEvents: "none",
           }}
         />
@@ -168,27 +150,109 @@ export function LandingCTA() {
 }
 
 export function LandingFooter() {
+  const columns: [string, string[]][] = [
+    ["Product", ["Features", "Pricing", "Roadmap"]],
+    ["Resources", ["Blog", "Help Center", "Changelog"]],
+    ["Company", ["About", "Privacy", "Terms"]],
+  ];
+
   return (
-    <footer
-      style={{
-        borderTop: "1px solid var(--line)",
-        padding: "36px 28px",
-        maxWidth: 1240,
-        margin: "0 auto",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 16,
-      }}
-    >
-      <span style={{ fontWeight: 700, fontSize: 18 }}>
-        <span style={{ color: "var(--ink)" }}>ecco</span>
-        <span style={{ color: "var(--accent)" }}>ai</span>
-      </span>
-      <div className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>
-        © 2026 eccoai — built to sound human
+    <footer style={{ borderTop: "1px solid var(--line)" }}>
+      <div
+        className="landing-footer-grid"
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "48px 28px",
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr 1fr 1fr",
+          gap: 40,
+        }}
+      >
+        {/* Brand column */}
+        <div>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 9,
+              fontWeight: 700,
+              fontSize: 20,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            <span style={{ color: "var(--ink)" }}>ecco</span>
+            <span style={{ color: "var(--accent)" }}>ai</span>
+          </span>
+          <p
+            style={{
+              marginTop: 14,
+              color: "var(--ink-2)",
+              fontSize: 14,
+              lineHeight: 1.55,
+              maxWidth: 320,
+            }}
+          >
+            AI-powered LinkedIn content that echoes your authentic voice. Build your presence without
+            losing yourself.
+          </p>
+        </div>
+
+        {/* Link columns */}
+        {columns.map(([head, items]) => (
+          <div key={head}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{head}</div>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              {items.map((x) => (
+                <li key={x}>
+                  <a
+                    href="#"
+                    style={{ color: "var(--ink-2)", textDecoration: "none", fontSize: 14 }}
+                  >
+                    {x}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
+
+      {/* Bottom bar */}
+      <div
+        style={{
+          borderTop: "1px solid var(--line)",
+          padding: "18px 28px",
+          maxWidth: 1200,
+          margin: "0 auto",
+          display: "flex",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+          fontSize: 12,
+          color: "var(--ink-3)",
+        }}
+      >
+        <div>&copy; 2026 eccoai. All rights reserved.</div>
+        <div style={{ display: "flex", gap: 18 }}>
+          <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
+            Privacy Policy
+          </a>
+          <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
+            Terms of Service
+          </a>
+        </div>
+      </div>
+      <style>{`@media (max-width: 760px) { .landing-footer-grid { grid-template-columns: 1fr 1fr !important; } }`}</style>
     </footer>
   );
 }

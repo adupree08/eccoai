@@ -8,6 +8,50 @@ const TONES = [
   { id: "list", label: "List", hint: "Listicle, scannable, practical" },
 ];
 
+/* Offline fallback sample posts so the demo still works without an API */
+const FALLBACK_SAMPLES: Record<string, string> = {
+  story: `I spent years trying to sound "professional" on LinkedIn.
+
+Every post was polished.
+Every post was forgettable.
+
+Then one Tuesday I posted about a client I'd just fired.
+No hook formula. No hashtags. Just what happened and what I learned.
+
+It did 40x my usual numbers.
+
+The lesson wasn't "be vulnerable."
+It was: stop rewriting yourself into someone else.
+
+What's a post you almost didn't publish?`,
+  bold: `"Personal branding" is the polite word for pretending.
+
+We've taught a generation of professionals to perform instead of think.
+To write hooks instead of sentences.
+To "add value" instead of having a point.
+
+The posts that move people are the ones written by people.
+
+Not templates.
+Not frameworks.
+Not a thirteen-step carousel.
+
+A thought. Clearly said.
+That's the whole job.`,
+  list: `Three things I stopped doing on LinkedIn. My reach doubled.
+
+1. Hook formulas. "Here's why most people fail at X." Everyone can smell them now.
+2. Hashtags. Haven't used one in a year. Didn't notice a drop.
+3. "Thoughts?" at the end of every post. It's fine to just end.
+
+What I did instead:
+— Wrote like I was talking to one specific client
+— Used line breaks like breath, not scaffolding
+— Said the point in the first sentence
+
+Which of these would be hardest for you to drop?`,
+};
+
 function Spinner() {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -77,12 +121,12 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idea, tone, audienceKey }),
       });
+      if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setPost(data.post || "Could not generate. Try again.");
     } catch {
-      setPost(
-        "Could not reach the model just now. But here's the shape: one hook, three beats, one question. Write what you wish you'd read a year ago."
-      );
+      // Offline fallback — use pre-baked drafts so the demo still lands
+      setPost(FALLBACK_SAMPLES[tone] || FALLBACK_SAMPLES.story);
     }
     setLoading(false);
   }
@@ -123,7 +167,7 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
               border: "1px solid var(--line-strong)",
               borderRadius: "var(--radius)",
               padding: "16px 18px",
-              fontFamily: "var(--font-body)",
+              fontFamily: "var(--font-sans)",
               fontSize: 17,
               lineHeight: 1.45,
               color: "var(--ink)",
@@ -151,7 +195,8 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
                 key={t.id}
                 onClick={() => setTone(t.id)}
                 style={{
-                  border: "1px solid " + (tone === t.id ? "var(--ink)" : "var(--line-strong)"),
+                  border:
+                    "1px solid " + (tone === t.id ? "var(--ink)" : "var(--line-strong)"),
                   background: tone === t.id ? "var(--ink)" : "transparent",
                   color: tone === t.id ? "var(--bg)" : "var(--ink)",
                   padding: "14px 14px",
@@ -190,6 +235,9 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
             cursor: "pointer",
             border: "none",
           }}
+          onMouseDown={(e) => ((e.currentTarget as HTMLElement).style.transform = "translateY(1px)")}
+          onMouseUp={(e) => ((e.currentTarget as HTMLElement).style.transform = "")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "")}
         >
           <span>{loading ? "Generating in your voice" : "Echo it back"}</span>
           <span>{loading ? <Spinner /> : "→"}</span>
@@ -199,8 +247,8 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
           <span className="mono" style={{ fontSize: 11 }}>
             note —{" "}
           </span>
-          this demo uses a shared default voice. In the product, eccoai trains a private voice
-          model on your writing.
+          this demo uses a shared default voice. In the product, eccoai trains a private voice model
+          on your writing.
         </div>
       </div>
 
@@ -259,7 +307,7 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
               letterSpacing: ".14em",
             }}
           >
-            {loading ? "echoing…" : post ? "ready" : "preview"}
+            {loading ? "echoing\u2026" : post ? "ready" : "preview"}
           </div>
         </div>
 
@@ -270,7 +318,7 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
             lineHeight: 1.55,
             whiteSpace: "pre-wrap",
             color: "var(--ink-2)",
-            fontFamily: "var(--font-body)",
+            fontFamily: "var(--font-sans)",
           }}
         >
           {typed ||
@@ -280,7 +328,7 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
               </span>
             ))}
           {loading && !typed && <Spinner />}
-          {loading && typed && <span style={{ opacity: 0.4 }}>▍</span>}
+          {loading && typed && <span style={{ opacity: 0.4 }}>{"\u258D"}</span>}
         </div>
 
         <div
