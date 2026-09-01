@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
+import { assertSafeUrl } from "@/lib/security/url-guard";
+
+export const maxDuration = 30;
 
 const parser = new Parser({
   timeout: 10000,
@@ -47,10 +50,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Block SSRF: a stored feed URL must not point at an internal address.
+    const safe = await assertSafeUrl(feed.url);
+    if (!safe.ok) {
+      return NextResponse.json(
+        { error: `Feed URL is not allowed: ${safe.reason}` },
+        { status: 400 }
+      );
+    }
+
     // Parse the RSS feed
     let rssFeed;
     try {
-      rssFeed = await parser.parseURL(feed.url);
+      rssFeed = await parser.parseURL(safe.url);
     } catch (parseError) {
       console.error("RSS parse error:", parseError);
       return NextResponse.json(
@@ -72,16 +84,12 @@ export async function POST(request: Request) {
       published_at: item.pubDate ? new Date(item.pubDate).toISOString() : null,
     }));
 
-    // Delete old articles for this feed (to refresh)
-    await supabase
-      .from("articles")
-      .delete()
-      .eq("feed_id", feedId);
-
-    // Insert new articles
+    // Upsert on (feed_id, url): add new articles, keep existing rows intact so a
+    // user's saved/hidden articles (which reference article rows) are never
+    // cascade-deleted by a refresh. Duplicates are skipped by the unique index.
     const { error: insertError } = await supabase
       .from("articles")
-      .insert(articles);
+      .upsert(articles, { onConflict: "feed_id,url", ignoreDuplicates: true });
 
     if (insertError) {
       console.error("Insert error:", insertError);

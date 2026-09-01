@@ -45,6 +45,25 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ===== eccoai brand palette (navy + LinkedIn blue) ===== */
+  --color-ecco: #e2e8f0;              /* default border */
+  --color-ecco-light: #f1f5f9;        /* subtle border / divider */
+  --color-ecco-off-white: #f8fafc;    /* section background */
+  --color-ecco-navy: #12294d;         /* primary brand, selected state */
+  --color-ecco-navy-light: #1d3a66;   /* primary hover */
+  --color-ecco-blue: #0a66c2;         /* brand blue, headings/accents */
+  --color-ecco-blue-soft: #bfdbfe;    /* soft blue fill */
+  --color-ecco-blue-pale: #eff6ff;    /* palest blue background */
+  --color-ecco-accent: #2563eb;       /* bright accent blue */
+  --color-ecco-accent-light: #dbeafe; /* accent chip background */
+  --color-ecco-purple: #7c3aed;       /* secondary accent */
+  --color-ecco-primary: #0f172a;      /* primary text (near-black) */
+  --color-ecco-secondary: #334155;    /* secondary text */
+  --color-ecco-tertiary: #64748b;     /* muted body text */
+  --color-ecco-muted: #94a3b8;        /* faint labels */
+  --color-ecco-error: #dc2626;        /* error / destructive */
+  --color-ecco-success: #16a34a;      /* success */
 }
 
 :root {
@@ -160,4 +179,10 @@
 [data-theme] ::selection {
   background: var(--accent);
   color: var(--accent-ink);
+}
+
+
+/* eccoai gradient fill (navy -> accent) */
+.bg-ecco-gradient {
+  background-image: linear-gradient(135deg, var(--color-ecco-navy), var(--color-ecco-accent));
 }

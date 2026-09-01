@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { assertSafeUrl } from "@/lib/security/url-guard";
+
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   try {
@@ -24,12 +27,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch the URL content
-    const response = await fetch(url, {
+    // Block SSRF: reject internal/private addresses before fetching.
+    const safe = await assertSafeUrl(url);
+    if (!safe.ok) {
+      return NextResponse.json({ error: safe.reason }, { status: 400 });
+    }
+
+    // Fetch the URL content. redirect: "manual" stops a public URL from
+    // redirecting into an internal address after the safety check.
+    const response = await fetch(safe.url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; EccoAI/1.0; +https://eccoai.vercel.app)",
       },
+      redirect: "manual",
+      signal: AbortSignal.timeout(10000),
     });
+
+    if (response.status >= 300 && response.status < 400) {
+      return NextResponse.json(
+        { error: "URL redirects are not allowed" },
+        { status: 400 }
+      );
+    }
 
     if (!response.ok) {
       return NextResponse.json(

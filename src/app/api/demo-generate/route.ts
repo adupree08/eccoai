@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { checkDemoRateLimit } from "@/lib/security/rate-limit";
 
 const AUDIENCE_BIOS: Record<string, string> = {
   consultants:
@@ -10,25 +11,16 @@ const AUDIENCE_BIOS: Record<string, string> = {
     "You are a senior marketer who writes LinkedIn posts that travel. You love clever hooks, concrete data, and a mild roast of bad marketing.",
 };
 
-// Simple in-memory rate limiting
-const requestCounts = new Map<string, { count: number; resetAt: number }>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = requestCounts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    requestCounts.set(ip, { count: 1, resetAt: now + 3600000 }); // 1 hour window
-    return false;
-  }
-  entry.count++;
-  return entry.count > 10; // 10 requests per hour per IP
-}
-
 export async function POST(req: NextRequest) {
-  // Rate limiting
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-  if (isRateLimited(ip)) {
-    return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
+  // Durable rate limiting + global daily spend cap (see lib/security/rate-limit).
+  // The client IP is best-effort (headers can be spoofed); the global cap is the
+  // real protection against runaway Anthropic spend.
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim()
+    || req.headers.get("x-real-ip")
+    || "unknown";
+  const decision = await checkDemoRateLimit(ip);
+  if (!decision.allowed) {
+    return NextResponse.json({ error: decision.reason }, { status: 429 });
   }
 
   try {

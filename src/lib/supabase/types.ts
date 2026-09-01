@@ -16,6 +16,8 @@ export interface Database {
           full_name: string | null;
           avatar_url: string | null;
           plan: "free" | "pro" | "enterprise";
+          is_admin: boolean;
+          timezone: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -25,6 +27,8 @@ export interface Database {
           full_name?: string | null;
           avatar_url?: string | null;
           plan?: "free" | "pro" | "enterprise";
+          is_admin?: boolean;
+          timezone?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -149,34 +153,57 @@ export interface Database {
           fetched_at?: string;
         };
       };
-      feedback: {
+      product_feedback: {
         Row: {
           id: string;
           user_id: string;
-          type: "feedback" | "bug" | "feature";
+          type: "bug" | "feature" | "other";
           message: string;
           status: "new" | "reviewed" | "resolved";
-          admin_notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type?: "bug" | "feature" | "other";
+          message: string;
+          status?: "new" | "reviewed" | "resolved";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: "bug" | "feature" | "other";
+          message?: string;
+          status?: "new" | "reviewed" | "resolved";
+          created_at?: string;
+        };
+      };
+      content_pillars: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          description: string | null;
+          color: string;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          type?: "feedback" | "bug" | "feature";
-          message: string;
-          status?: "new" | "reviewed" | "resolved";
-          admin_notes?: string | null;
+          name: string;
+          description?: string | null;
+          color?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
-          type?: "feedback" | "bug" | "feature";
-          message?: string;
-          status?: "new" | "reviewed" | "resolved";
-          admin_notes?: string | null;
+          name?: string;
+          description?: string | null;
+          color?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -244,14 +271,16 @@ export interface Database {
           id: string;
           user_id: string;
           content: string;
-          source_type: "idea" | "url" | "rss";
+          source_type: "idea" | "url" | "rss" | "comment";
           source_url: string | null;
           source_article_id: string | null;
           brand_voice_id: string | null;
+          pillar_id: string | null;
+          image_url: string | null;
           formats: string[];
           tones: string[];
           angles: string[];
-          status: "draft" | "scheduled" | "published";
+          status: "idea" | "draft" | "ready" | "revisions" | "scheduled" | "published";
           scheduled_at: string | null;
           published_at: string | null;
           linkedin_post_id: string | null;
@@ -266,14 +295,16 @@ export interface Database {
           id?: string;
           user_id: string;
           content: string;
-          source_type?: "idea" | "url" | "rss";
+          source_type?: "idea" | "url" | "rss" | "comment";
           source_url?: string | null;
           source_article_id?: string | null;
           brand_voice_id?: string | null;
+          pillar_id?: string | null;
+          image_url?: string | null;
           formats?: string[];
           tones?: string[];
           angles?: string[];
-          status?: "draft" | "scheduled" | "published";
+          status?: "idea" | "draft" | "ready" | "revisions" | "scheduled" | "published";
           scheduled_at?: string | null;
           published_at?: string | null;
           linkedin_post_id?: string | null;
@@ -288,14 +319,16 @@ export interface Database {
           id?: string;
           user_id?: string;
           content?: string;
-          source_type?: "idea" | "url" | "rss";
+          source_type?: "idea" | "url" | "rss" | "comment";
           source_url?: string | null;
           source_article_id?: string | null;
           brand_voice_id?: string | null;
+          pillar_id?: string | null;
+          image_url?: string | null;
           formats?: string[];
           tones?: string[];
           angles?: string[];
-          status?: "draft" | "scheduled" | "published";
+          status?: "idea" | "draft" | "ready" | "revisions" | "scheduled" | "published";
           scheduled_at?: string | null;
           published_at?: string | null;
           linkedin_post_id?: string | null;
@@ -305,6 +338,49 @@ export interface Database {
           reposts?: number;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      popular_posts: {
+        Row: {
+          id: string; source: string; external_id: string | null;
+          author_name: string | null; author_headline: string | null; post_url: string | null;
+          content: string; vertical: string | null; keywords: string[];
+          likes: number; comments: number; reposts: number;
+          posted_at: string | null; created_at: string;
+        };
+        Insert: {
+          id?: string; source?: string; external_id?: string | null;
+          author_name?: string | null; author_headline?: string | null; post_url?: string | null;
+          content: string; vertical?: string | null; keywords?: string[];
+          likes?: number; comments?: number; reposts?: number;
+          posted_at?: string | null; created_at?: string;
+        };
+        Update: {
+          id?: string; source?: string; external_id?: string | null;
+          author_name?: string | null; author_headline?: string | null; post_url?: string | null;
+          content?: string; vertical?: string | null; keywords?: string[];
+          likes?: number; comments?: number; reposts?: number;
+          posted_at?: string | null; created_at?: string;
+        };
+      };
+      post_structures: {
+        Row: {
+          id: string; name: string; description: string;
+          hook_type: string | null; example: string | null;
+          skeleton: string | null; user_id: string | null;
+          approved: boolean; created_at: string;
+        };
+        Insert: {
+          id?: string; name: string; description: string;
+          hook_type?: string | null; example?: string | null;
+          skeleton?: string | null; user_id?: string | null;
+          approved?: boolean; created_at?: string;
+        };
+        Update: {
+          id?: string; name?: string; description?: string;
+          hook_type?: string | null; example?: string | null;
+          skeleton?: string | null; user_id?: string | null;
+          approved?: boolean; created_at?: string;
         };
       };
     };

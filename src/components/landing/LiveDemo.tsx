@@ -121,6 +121,14 @@ export function LiveDemo({ audienceKey }: LiveDemoProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idea, tone, audienceKey }),
       });
+      // Rate limited: tell the user plainly. Never show a canned sample here,
+      // or they would think the AI wrote it.
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        setPost(data.error || "You've hit the demo limit. Sign up to keep going.");
+        setLoading(false);
+        return;
+      }
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setPost(data.post || "Could not generate. Try again.");

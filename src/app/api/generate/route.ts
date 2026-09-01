@@ -3,6 +3,18 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "@/lib/prompts/system-prompt";
 
+// Claude completions routinely run past the 10s default. Without this the
+// platform kills the function mid-generation and the user sees a parse error
+// while the Anthropic call still bills.
+export const maxDuration = 60;
+
+// Cap the prompt so one user cannot drive unbounded token spend.
+const MAX_CONTENT_CHARS = 20000;
+
+function isCommentRequest(sourceType: unknown) {
+  return sourceType === "comment";
+}
+
 // Lazy initialization to avoid build-time errors
 function getAnthropic() {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -27,6 +39,30 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+
+    // Validate before spending tokens. Without this, a non-string content
+    // coerces to "[object Object]"/"null" and still bills a full request, and
+    // an oversized body can cost dollars per call.
+    const rawContent = body?.content;
+    if (typeof rawContent !== "string" || rawContent.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Content is required." },
+        { status: 400 }
+      );
+    }
+    if (rawContent.length > MAX_CONTENT_CHARS) {
+      return NextResponse.json(
+        { error: `Content is too long. Limit is ${MAX_CONTENT_CHARS.toLocaleString()} characters.` },
+        { status: 400 }
+      );
+    }
+    if (body?.userAngle != null && typeof body.userAngle !== "string") {
+      return NextResponse.json(
+        { error: "Invalid angle." },
+        { status: 400 }
+      );
+    }
+
     const {
       sourceType,
       content,
@@ -44,6 +80,9 @@ export async function POST(request: Request) {
       // Edit mode options
       editAction = null,
       customInstruction = null,
+      pillar = null,
+      templateId = null,
+      similarity = "balanced",
     } = body;
 
     // Fetch brand voice if provided
@@ -78,6 +117,53 @@ export async function POST(request: Request) {
       viralAngle: viralAngle || null,
       engagementGoal: engagementGoal || undefined,
     });
+
+    // Steer the post toward the selected content pillar, if any.
+    let systemPromptWithPillar = systemPrompt;
+    if (pillar && typeof pillar === "object" && typeof pillar.name === "string") {
+      const desc = typeof pillar.description === "string" && pillar.description.trim()
+        ? ` ${pillar.description.trim()}`
+        : "";
+      systemPromptWithPillar += `\n\nCONTENT PILLAR: This post belongs to the "${pillar.name}" content pillar.${desc} Keep the topic, framing, and takeaway aligned with this theme.`;
+    }
+
+    // Template handling. If the user picked a specific template, follow it per
+    // the similarity setting. Otherwise, lightly offer the approved GLOBAL
+    // structures (learned from popular posts) as optional inspiration.
+    if (!isCommentRequest(sourceType)) {
+      if (templateId) {
+        const { data: tpl } = await supabase
+          .from("post_structures")
+          .select("name, description, skeleton")
+          .eq("id", templateId)
+          .single();
+        if (tpl) {
+          const strictness =
+            similarity === "close"
+              ? "Follow this structure closely: keep its hook style, section shape, and pacing. Only the topic and specifics change."
+              : similarity === "loose"
+                ? "Use this structure as loose inspiration. Borrow what fits and feel free to depart from it."
+                : "Follow this structure while adapting it naturally to the topic. Keep its overall shape, but don't be rigid.";
+          systemPromptWithPillar += `\n\nPOST TEMPLATE — "${tpl.name}". ${strictness}\nStructure: ${tpl.description}`;
+          if (tpl.skeleton) {
+            systemPromptWithPillar += `\nSkeleton (replace the {bracketed} parts with real, specific content; never leave a bracket in the output):\n${tpl.skeleton}`;
+          }
+        }
+      } else {
+        const { data: structures } = await supabase
+          .from("post_structures")
+          .select("name, description")
+          .eq("approved", true)
+          .is("user_id", null)
+          .limit(8);
+        if (structures && structures.length > 0) {
+          const list = structures
+            .map((st: { name: string; description: string }) => `- ${st.name}: ${st.description}`)
+            .join("\n");
+          systemPromptWithPillar += `\n\nPROVEN POST STRUCTURES (draw on these high-performing patterns where they fit; do not force one):\n${list}`;
+        }
+      }
+    }
 
     // Build the user prompt based on source type
     let sourceContext = "";
@@ -201,7 +287,7 @@ IMPORTANT: Return your response as valid JSON in this exact format:
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 2048,
-      system: systemPrompt,
+      system: systemPromptWithPillar,
       messages: [
         { role: "user", content: userPrompt },
       ],

@@ -86,16 +86,12 @@ export async function POST(request: Request) {
       published_at: item.pubDate ? new Date(item.pubDate).toISOString() : null,
     }));
 
-    // Delete old articles for this feed (to refresh)
-    await supabase
-      .from("articles")
-      .delete()
-      .eq("feed_id", feedId);
-
-    // Insert new articles
+    // Upsert on (feed_id, url): add new articles, keep existing rows intact so a
+    // user's saved/hidden articles (which reference article rows) are never
+    // cascade-deleted by a refresh. Duplicates are skipped by the unique index.
     const { error: insertError } = await supabase
       .from("articles")
-      .insert(articles);
+      .upsert(articles, { onConflict: "feed_id,url", ignoreDuplicates: true });
 
     if (insertError) {
       console.error("Insert error:", insertError);

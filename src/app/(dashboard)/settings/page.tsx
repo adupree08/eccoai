@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,14 @@ import {
   Trash2,
   Star,
   LogOut,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
+import { useBrandVoices } from "@/hooks/use-brand-voices";
+import { ContentPillarsManager } from "@/components/settings/content-pillars-manager";
+import { TimezoneSelect } from "@/components/settings/timezone-select";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 interface VoiceGuideline {
@@ -60,35 +65,27 @@ interface BrandVoice {
   samples: VoiceSample[];
 }
 
-// Initial mock saved voices
-const initialSavedVoices: BrandVoice[] = [
-  {
-    id: "1",
-    name: "Professional Thought Leader",
-    description: "Authoritative yet approachable voice for sharing industry insights",
-    isDefault: true,
-    guidelines: [
-      { id: "1", category: "Tone", guideline: "Be conversational and approachable, not formal or corporate" },
-      { id: "2", category: "Tone", guideline: "Use first-person perspective ('I', 'my') to build connection" },
-      { id: "3", category: "Structure", guideline: "Start with a hook that grabs attention in the first line" },
-      { id: "4", category: "Structure", guideline: "Use short paragraphs and plenty of white space" },
-      { id: "5", category: "Content", guideline: "Share personal stories and real experiences" },
-      { id: "6", category: "Content", guideline: "Provide actionable insights, not just theories" },
-    ],
-    excludedTerms: [
-      { id: "1", term: "leverage", reason: "Too corporate" },
-      { id: "2", term: "synergy", reason: "Overused buzzword" },
-      { id: "3", term: "disrupt", reason: "Cliche" },
-    ],
-    preferredTerms: [
-      { id: "1", term: "use", useInsteadOf: "leverage" },
-      { id: "2", term: "collaboration", useInsteadOf: "synergy" },
-    ],
-    samples: [],
-  },
-];
-
 const categories = ["Tone", "Structure", "Content", "Style"];
+
+type VoiceRow = {
+  id: string; name: string; description: string | null; is_default: boolean;
+  guidelines: string[]; excluded_terms: string[]; preferred_terms: string[]; samples: string[];
+};
+
+// The DB stores plain string arrays (what the AI prompt consumes). The editor
+// uses richer objects, so we map between the two shapes here.
+function rowToVoice(r: VoiceRow): BrandVoice {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description || "",
+    isDefault: r.is_default,
+    guidelines: (r.guidelines || []).map((g, i) => ({ id: `g${i}`, category: "", guideline: g })),
+    excludedTerms: (r.excluded_terms || []).map((t, i) => ({ id: `e${i}`, term: t })),
+    preferredTerms: (r.preferred_terms || []).map((t, i) => ({ id: `p${i}`, term: t, useInsteadOf: "" })),
+    samples: (r.samples || []).map((c, i) => ({ id: `s${i}`, content: c })),
+  };
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -96,8 +93,16 @@ export default function SettingsPage() {
   const supabase = createClient();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState("brand-voice");
-  const [savedVoices, setSavedVoices] = useState<BrandVoice[]>(initialSavedVoices);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>("1");
+  const {
+    brandVoices: dbVoices,
+    error: voicesError,
+    createBrandVoice,
+    updateBrandVoice,
+    deleteBrandVoice,
+    setDefaultVoice,
+  } = useBrandVoices();
+  const [savedVoices, setSavedVoices] = useState<BrandVoice[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newVoiceName, setNewVoiceName] = useState("");
   const [newVoiceDescription, setNewVoiceDescription] = useState("");
@@ -123,6 +128,29 @@ export default function SettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+
+  // Hydrate the editor from the database once voices load.
+  useEffect(() => {
+    const mapped = (dbVoices as unknown as VoiceRow[]).map(rowToVoice);
+    setSavedVoices(mapped);
+    if (isCreatingNew) return;
+    const keep = selectedVoiceId && mapped.some((v) => v.id === selectedVoiceId);
+    const target = keep
+      ? mapped.find((v) => v.id === selectedVoiceId)!
+      : (mapped.find((v) => v.isDefault) || mapped[0]);
+    if (target) {
+      setSelectedVoiceId(target.id);
+      setGuidelines(target.guidelines);
+      setExcludedTerms(target.excludedTerms);
+      setPreferredTerms(target.preferredTerms);
+      setSamples(target.samples);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbVoices]);
+
+  useEffect(() => {
+    if (voicesError) toast.error("Could not load your saved voices");
+  }, [voicesError]);
 
   const handleSelectVoice = (voiceId: string) => {
     const voice = savedVoices.find((v) => v.id === voiceId);
@@ -203,58 +231,68 @@ export default function SettingsPage() {
     setSamples(samples.filter((s) => s.id !== id));
   };
 
-  const handleSetDefault = (voiceId: string) => {
-    setSavedVoices(savedVoices.map((v) => ({
-      ...v,
-      isDefault: v.id === voiceId,
-    })));
+  const handleSetDefault = async (voiceId: string) => {
+    setSavedVoices(savedVoices.map((v) => ({ ...v, isDefault: v.id === voiceId })));
+    const { error } = await setDefaultVoice(voiceId);
+    if (error) toast.error("Could not set default voice");
   };
 
-  const handleDeleteVoice = (voiceId: string) => {
+  const handleDeleteVoice = async (voiceId: string) => {
     const voice = savedVoices.find((v) => v.id === voiceId);
-    if (voice?.isDefault) return; // Can't delete default voice
-
-    setSavedVoices(savedVoices.filter((v) => v.id !== voiceId));
-    if (selectedVoiceId === voiceId) {
-      const defaultVoice = savedVoices.find((v) => v.isDefault);
-      if (defaultVoice) {
-        handleSelectVoice(defaultVoice.id);
-      }
+    if (voice?.isDefault) {
+      toast.error("Set another voice as default before deleting this one");
+      return;
     }
+    const { error } = await deleteBrandVoice(voiceId);
+    if (error) {
+      toast.error("Could not delete voice");
+      return;
+    }
+    setSavedVoices((prev) => prev.filter((v) => v.id !== voiceId));
+    if (selectedVoiceId === voiceId) {
+      const defaultVoice = savedVoices.find((v) => v.isDefault && v.id !== voiceId);
+      if (defaultVoice) handleSelectVoice(defaultVoice.id);
+      else setSelectedVoiceId(null);
+    }
+    toast.success("Voice deleted");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-
-    setTimeout(() => {
+    const payload = {
+      guidelines: guidelines.map((g) => g.guideline).filter(Boolean),
+      excluded_terms: excludedTerms.map((t) => t.term).filter(Boolean),
+      preferred_terms: preferredTerms.map((t) => t.term).filter(Boolean),
+      samples: samples.map((s) => s.content).filter(Boolean),
+    };
+    try {
       if (isCreatingNew && newVoiceName.trim()) {
-        // Create new voice
-        const newVoice: BrandVoice = {
-          id: Date.now().toString(),
-          name: newVoiceName,
-          description: newVoiceDescription,
-          isDefault: savedVoices.length === 0,
-          guidelines,
-          excludedTerms,
-          preferredTerms,
-          samples,
-        };
-        setSavedVoices([...savedVoices, newVoice]);
-        setSelectedVoiceId(newVoice.id);
+        const { data, error } = await createBrandVoice({
+          name: newVoiceName.trim(),
+          description: newVoiceDescription.trim() || null,
+          is_default: savedVoices.length === 0,
+          ...payload,
+        });
+        if (error || !data) {
+          toast.error(error || "Could not save voice");
+          return;
+        }
+        setSelectedVoiceId(data.id);
         setIsCreatingNew(false);
       } else if (selectedVoiceId) {
-        // Update existing voice
-        setSavedVoices(savedVoices.map((v) =>
-          v.id === selectedVoiceId
-            ? { ...v, guidelines, excludedTerms, preferredTerms, samples }
-            : v
-        ));
+        const { error } = await updateBrandVoice(selectedVoiceId, payload);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+      } else {
+        return;
       }
-
-      setIsSaving(false);
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
-    }, 1000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -298,28 +336,35 @@ export default function SettingsPage() {
         <TabsList className="bg-white border border-ecco p-1 h-auto">
           <TabsTrigger
             value="brand-voice"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <MessageSquare className="mr-2 h-4 w-4" />
             Brand Voice
           </TabsTrigger>
           <TabsTrigger
+            value="pillars"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
+          >
+            <Layers className="mr-2 h-4 w-4" />
+            Content Pillars
+          </TabsTrigger>
+          <TabsTrigger
             value="account"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <User className="mr-2 h-4 w-4" />
             Account
           </TabsTrigger>
           <TabsTrigger
             value="integrations"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <Zap className="mr-2 h-4 w-4" />
             Integrations
           </TabsTrigger>
           <TabsTrigger
             value="notifications"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <Bell className="mr-2 h-4 w-4" />
             Notifications
@@ -746,6 +791,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Account Tab */}
+        <TabsContent value="pillars" className="space-y-6 mt-6">
+          <ContentPillarsManager />
+        </TabsContent>
+
         <TabsContent value="account" className="space-y-6 mt-6">
           <Card className="border-ecco">
             <CardHeader>
@@ -759,7 +808,7 @@ export default function SettingsPage() {
                   <label className="text-sm font-medium text-ecco-secondary mb-2 block">
                     Full Name
                   </label>
-                  <Input placeholder="Your name" defaultValue={user?.user_metadata?.full_name || ""} />
+                  <Input key={user?.id || "nn"} placeholder="Your name" defaultValue={user?.user_metadata?.full_name || ""} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-ecco-secondary mb-2 block">
@@ -782,6 +831,7 @@ export default function SettingsPage() {
                   placeholder="https://linkedin.com/in/yourprofile"
                 />
               </div>
+              <TimezoneSelect />
             </CardContent>
           </Card>
 

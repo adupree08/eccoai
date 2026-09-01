@@ -20,10 +20,11 @@ import {
   Eye,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { AdminResearchPanel } from "@/components/admin/research-panel";
 import { formatDistanceToNow } from "@/lib/utils";
 
 // Admin email whitelist
-const ADMIN_EMAILS = ["aujena.dupree@gmail.com"];
+const ADMIN_EMAILS = ["aujena.dupree@gmail.com", "aujena.dupree+strattadev@gmail.com"];
 
 interface UserStats {
   id: string;
@@ -56,11 +57,19 @@ export default function AdminPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      router.push("/auth");
+      router.push("/login");
       return;
     }
 
-    if (!ADMIN_EMAILS.includes(user.email || "")) {
+    // Real gate: the is_admin flag on the profile (server-enforced by RLS on
+    // admin data + the admin API routes). Email lists drift; this does not.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.is_admin) {
       router.push("/dashboard");
       return;
     }
@@ -310,6 +319,9 @@ export default function AdminPage() {
           </Card>
         </div>
       )}
+
+      {/* Vertical Research */}
+      <AdminResearchPanel />
 
       {/* User Management */}
       <Card className="border-ecco">

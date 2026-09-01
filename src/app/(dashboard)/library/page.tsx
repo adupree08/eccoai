@@ -1,18 +1,22 @@
 "use client";
 
-import { useState, Suspense, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useEffect, useMemo } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search,
-  Filter,
-  Calendar,
   Copy,
   Trash2,
   Edit3,
@@ -20,506 +24,439 @@ import {
   Check,
   Sparkles,
   Loader2,
-  FileText,
+  GripVertical,
+  AlertCircle,
 } from "lucide-react";
-import { cn, formatDistanceToNow } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { usePosts } from "@/hooks/use-posts";
+import { Database } from "@/lib/supabase/types";
+import { toast } from "sonner";
 
-function LibraryContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const initialFilter = searchParams.get("filter") || "all";
+type Post = Database["public"]["Tables"]["posts"]["Row"];
+type Status = Post["status"];
 
-  const { posts, loading, updatePost, deletePost, schedulePost } = usePosts();
+const COLUMNS: { key: Status; label: string; hint: string }[] = [
+  { key: "idea", label: "Idea", hint: "Raw concepts" },
+  { key: "draft", label: "Draft", hint: "In progress" },
+  { key: "ready", label: "Ready", hint: "Approved to post" },
+  { key: "revisions", label: "Revisions", hint: "Needs work" },
+  { key: "scheduled", label: "Scheduled", hint: "Queued" },
+  { key: "published", label: "Published", hint: "Live" },
+];
 
-  const [activeFilter, setActiveFilter] = useState(initialFilter);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
-  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
-  const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+const COLUMN_ACCENT: Record<Status, string> = {
+  idea: "#94a3b8",
+  draft: "#2563eb",
+  ready: "#16a34a",
+  revisions: "#d97706",
+  scheduled: "#0a66c2",
+  published: "#7c3aed",
+};
+
+export default function LibraryPage() {
+  const { posts, loading, error, updatePost, deletePost, refetch } = usePosts();
+
+  // Local board mirror so drag feels instant; reverts on server error.
+  const [board, setBoard] = useState<Post[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [refiningId, setRefiningId] = useState<string | null>(null);
+  const [refineFor, setRefineFor] = useState<string | null>(null);
+  const [refineText, setRefineText] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
-  const filteredPosts = useMemo(() => {
-    let result = posts;
+  useEffect(() => {
+    setBoard(posts);
+  }, [posts]);
 
-    // Filter by status
-    if (activeFilter === "drafts") {
-      result = result.filter((p) => p.status === "draft");
-    } else if (activeFilter === "scheduled") {
-      result = result.filter((p) => p.status === "scheduled");
-    } else if (activeFilter === "published") {
-      result = result.filter((p) => p.status === "published");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const visible = useMemo(() => {
+    if (!search.trim()) return board;
+    const q = search.toLowerCase();
+    return board.filter((p) => p.content.toLowerCase().includes(q));
+  }, [board, search]);
+
+  const byColumn = (status: Status) => visible.filter((p) => p.status === status);
+
+  const activePost = activeId ? board.find((p) => p.id === activeId) : null;
+
+  const handleDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
+
+  const handleDragEnd = async (e: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = e;
+    if (!over) return;
+    const id = String(active.id);
+    const newStatus = String(over.id) as Status;
+    const post = board.find((p) => p.id === id);
+    if (!post || post.status === newStatus) return;
+
+    const prevStatus = post.status;
+    // Optimistic move.
+    setBoard((prev) => prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p)));
+
+    const updates: Partial<Post> = { status: newStatus };
+    if (newStatus === "scheduled" && !post.scheduled_at) {
+      updates.scheduled_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    }
+    if (newStatus === "published" && !post.published_at) {
+      updates.published_at = new Date().toISOString();
     }
 
-    // Filter by search
-    if (searchQuery) {
-      result = result.filter((p) =>
-        p.content.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    return result;
-  }, [posts, activeFilter, searchQuery]);
-
-  const toggleSelectPost = (postId: string) => {
-    const newSelected = new Set(selectedPosts);
-    if (newSelected.has(postId)) {
-      newSelected.delete(postId);
+    const { error: updErr } = await updatePost(id, updates);
+    if (updErr) {
+      // Revert on failure.
+      setBoard((prev) => prev.map((p) => (p.id === id ? { ...p, status: prevStatus } : p)));
+      toast.error("Could not move the post. Try again.");
     } else {
-      newSelected.add(postId);
-    }
-    setSelectedPosts(newSelected);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedPosts.size === filteredPosts.length) {
-      setSelectedPosts(new Set());
-    } else {
-      setSelectedPosts(new Set(filteredPosts.map((p) => p.id)));
+      toast.success(`Moved to ${COLUMNS.find((c) => c.key === newStatus)?.label}`);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "draft":
-        return (
-          <Badge className="bg-ecco-accent-light text-ecco-accent border-0 text-[10px] font-semibold">
-            Draft
-          </Badge>
-        );
-      case "scheduled":
-        return (
-          <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-semibold">
-            Scheduled
-          </Badge>
-        );
-      case "published":
-        return (
-          <Badge className="bg-green-100 text-green-700 border-0 text-[10px] font-semibold">
-            Published
-          </Badge>
-        );
-      default:
-        return null;
+  const startEdit = (p: Post) => {
+    setEditingId(p.id);
+    setEditText(p.content);
+    setRefineFor(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSavingId(editingId);
+    const { error: updErr } = await updatePost(editingId, { content: editText });
+    setSavingId(null);
+    if (updErr) {
+      toast.error("Could not save your changes.");
+      return;
     }
+    toast.success("Saved");
+    setEditingId(null);
+    setEditText("");
   };
 
-  const handleEdit = (post: { id: string; content: string }) => {
-    setEditingPostId(post.id);
-    setEditContent(post.content);
-    setExpandedPostId(post.id);
+  const handleDelete = async (id: string) => {
+    const { error: delErr } = await deletePost(id);
+    if (delErr) toast.error("Could not delete the post.");
+    else toast.success("Post deleted");
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingPostId) return;
-
-    setSavingPostId(editingPostId);
+  const handleCopy = async (id: string, content: string) => {
     try {
-      await updatePost(editingPostId, { content: editContent });
-      setEditingPostId(null);
-      setEditContent("");
+      await navigator.clipboard.writeText(content);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      alert("Failed to save changes");
-    } finally {
-      setSavingPostId(null);
+      toast.error("Could not copy to clipboard");
     }
   };
 
-  const handleCopy = (content: string, id: string) => {
-    navigator.clipboard.writeText(content);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const handleDelete = async (postId: string) => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-
-    setDeletingPostId(postId);
+  // The AI refinement loop: ask the AI to revise a post in place.
+  const runRefine = async (p: Post) => {
+    if (!refineText.trim()) return;
+    setRefiningId(p.id);
     try {
-      await deletePost(postId);
-      setExpandedPostId(null);
-    } catch {
-      alert("Failed to delete post");
-    } finally {
-      setDeletingPostId(null);
-    }
-  };
-
-  const handleSchedule = async (postId: string) => {
-    setSavingPostId(postId);
-    try {
-      const scheduledAt = new Date();
-      scheduledAt.setDate(scheduledAt.getDate() + 1);
-      scheduledAt.setHours(9, 0, 0, 0);
-
-      await schedulePost(postId, scheduledAt);
-    } catch {
-      alert("Failed to schedule post");
-    } finally {
-      setSavingPostId(null);
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "";
-    try {
-      return formatDistanceToNow(new Date(dateString));
-    } catch {
-      return "";
-    }
-  };
-
-  const formatScheduledDate = (dateString: string | null) => {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceType: "edit",
+          content: p.content,
+          editAction: "custom",
+          customInstruction: refineText.trim(),
+        }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "The AI could not revise this post.");
+        return;
+      }
+      const revised = data.posts?.[0]?.content;
+      if (!revised) {
+        toast.error("No revision was returned. Try rephrasing your request.");
+        return;
+      }
+      const { error: updErr } = await updatePost(p.id, { content: revised, status: "revisions" });
+      if (updErr) {
+        toast.error("Revised, but could not save. Try again.");
+        return;
+      }
+      toast.success("Revised by AI");
+      setRefineFor(null);
+      setRefineText("");
     } catch {
-      return "";
+      toast.error("Something went wrong talking to the AI.");
+    } finally {
+      setRefiningId(null);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ecco-primary">
-              Library
-            </h1>
-            <p className="text-sm text-ecco-tertiary">
-              All your saved posts in one place
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ecco-primary">
-            Library
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ecco-primary">Library</h1>
           <p className="text-sm text-ecco-tertiary">
-            All your saved posts in one place
+            Drag posts across the pipeline. Edit, refine with AI, or schedule.
           </p>
         </div>
-      </div>
-
-      {/* Search and Filter Bar */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative w-64 max-w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ecco-muted" />
           <Input
             placeholder="Search posts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" />
-          Filters
-        </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-        <div className="flex items-center justify-between">
-          <TabsList className="bg-transparent border-b border-ecco w-full justify-start rounded-none h-auto p-0 gap-6">
-            <TabsTrigger
-              value="all"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
-            >
-              All Posts ({posts.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="drafts"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
-            >
-              Drafts ({posts.filter(p => p.status === "draft").length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="scheduled"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
-            >
-              Scheduled ({posts.filter(p => p.status === "scheduled").length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="published"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-ecco-navy data-[state=active]:text-ecco-navy data-[state=active]:shadow-none rounded-none pb-3 px-0 font-medium"
-            >
-              Published ({posts.filter(p => p.status === "published").length})
-            </TabsTrigger>
-          </TabsList>
+      {/* Load error (never silently show an empty board) */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-ecco-error">
+          <AlertCircle className="h-4 w-4" />
+          Could not load your posts.
+          <button onClick={() => refetch()} className="underline font-medium">
+            Retry
+          </button>
         </div>
+      )}
 
-        {/* Bulk Actions */}
-        {selectedPosts.size > 0 && (
-          <div className="flex items-center gap-4 mt-4 p-3 bg-white border border-ecco rounded-lg">
-            <label className="flex items-center gap-2 text-sm font-medium text-ecco-secondary cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedPosts.size === filteredPosts.length}
-                onChange={toggleSelectAll}
-                className="accent-ecco-accent w-4 h-4"
-              />
-              {selectedPosts.size} selected
-            </label>
-            <div className="flex gap-2 ml-auto">
-              <Button variant="secondary" size="sm">
-                <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                Schedule All
-              </Button>
-              <Button variant="secondary" size="sm" className="text-ecco-error hover:text-ecco-error">
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                Delete
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Posts Grid */}
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 mt-6">
-          {filteredPosts.map((post) => (
-            <Card
-              key={post.id}
-              className={cn(
-                "border-ecco transition-all cursor-pointer",
-                expandedPostId === post.id && "col-span-full cursor-default",
-                selectedPosts.has(post.id) && "ring-2 ring-ecco-accent"
-              )}
-              onClick={() => {
-                if (!editingPostId && expandedPostId !== post.id) {
-                  setExpandedPostId(expandedPostId === post.id ? null : post.id);
-                }
-              }}
-            >
-              <CardContent className="p-5">
-                {/* Card Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedPosts.has(post.id)}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      toggleSelectPost(post.id);
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
+        </div>
+      ) : (
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {COLUMNS.map((col) => (
+              <KanbanColumn
+                key={col.key}
+                status={col.key}
+                label={col.label}
+                hint={col.hint}
+                count={byColumn(col.key).length}
+              >
+                {byColumn(col.key).map((p) => (
+                  <KanbanCard
+                    key={p.id}
+                    post={p}
+                    isEditing={editingId === p.id}
+                    editText={editText}
+                    onEditTextChange={setEditText}
+                    onStartEdit={() => startEdit(p)}
+                    onCancelEdit={() => setEditingId(null)}
+                    onSaveEdit={saveEdit}
+                    saving={savingId === p.id}
+                    onDelete={() => handleDelete(p.id)}
+                    onCopy={() => handleCopy(p.id, p.content)}
+                    copied={copiedId === p.id}
+                    refineOpen={refineFor === p.id}
+                    onToggleRefine={() => {
+                      setRefineFor(refineFor === p.id ? null : p.id);
+                      setRefineText("");
                     }}
-                    className="accent-ecco-accent w-4 h-4 mt-0.5"
-                    onClick={(e) => e.stopPropagation()}
+                    refineText={refineText}
+                    onRefineTextChange={setRefineText}
+                    onRunRefine={() => runRefine(p)}
+                    refining={refiningId === p.id}
                   />
-                  {getStatusBadge(post.status)}
-                </div>
+                ))}
+              </KanbanColumn>
+            ))}
+          </div>
 
-                {/* Content */}
-                {expandedPostId === post.id ? (
-                  /* Expanded View */
-                  editingPostId === post.id ? (
-                    <div className="space-y-4">
-                      <Textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="min-h-[200px] resize-y"
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingPostId(null);
-                            setEditContent("");
-                          }}
-                        >
-                          <X className="mr-1.5 h-3.5 w-3.5" />
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          disabled={savingPostId === post.id}
-                          className="bg-ecco-navy hover:bg-ecco-navy-light"
-                        >
-                          {savingPostId === post.id ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Check className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <p className="text-sm text-ecco-primary whitespace-pre-wrap leading-relaxed">
-                        {post.content}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(post);
-                          }}
-                        >
-                          <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopy(post.content, post.id);
-                          }}
-                        >
-                          {copiedId === post.id ? (
-                            <Check className="mr-1.5 h-3.5 w-3.5 text-ecco-success" />
-                          ) : (
-                            <Copy className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          {copiedId === post.id ? "Copied" : "Copy"}
-                        </Button>
-                        {post.status === "draft" && (
-                          <>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSchedule(post.id);
-                              }}
-                              disabled={savingPostId === post.id}
-                            >
-                              {savingPostId === post.id ? (
-                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                              )}
-                              Schedule
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="bg-ecco-navy hover:bg-ecco-navy-light"
-                            >
-                              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                              Regenerate
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(post.id);
-                          }}
-                          disabled={deletingPostId === post.id}
-                          className="text-ecco-error hover:text-ecco-error"
-                        >
-                          {deletingPostId === post.id ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          Delete
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedPostId(null);
-                          }}
-                          className="ml-auto"
-                        >
-                          <X className="mr-1.5 h-3.5 w-3.5" />
-                          Close
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  /* Collapsed View */
-                  <p className="text-sm text-ecco-primary line-clamp-4 leading-relaxed mb-4">
-                    {post.content}
-                  </p>
-                )}
-
-                {/* Meta Footer */}
-                {expandedPostId !== post.id && (
-                  <div className="flex items-center justify-between pt-3 border-t border-ecco-light">
-                    <span className="text-xs text-ecco-tertiary">
-                      {formatDate(post.created_at)}
-                    </span>
-                    {post.status === "published" && post.impressions && (
-                      <span className="text-xs text-ecco-tertiary">
-                        {post.impressions.toLocaleString()} views
-                      </span>
-                    )}
-                    {post.status === "scheduled" && post.scheduled_at && (
-                      <span className="text-xs text-ecco-tertiary">
-                        {formatScheduledDate(post.scheduled_at)}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Empty State */}
-        {filteredPosts.length === 0 && (
-          <Card className="border-ecco border-dashed mt-6">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ecco-accent-light">
-                <FileText className="h-6 w-6 text-ecco-accent" />
+          <DragOverlay>
+            {activePost ? (
+              <div className="w-72 rounded-lg border border-ecco bg-white p-3 shadow-lg">
+                <p className="text-xs text-ecco-primary line-clamp-4 whitespace-pre-wrap">
+                  {activePost.content}
+                </p>
               </div>
-              <h3 className="text-base font-semibold text-ecco-primary">
-                {searchQuery ? "No posts found" : "No posts yet"}
-              </h3>
-              <p className="mt-1 text-sm text-ecco-tertiary text-center max-w-md">
-                {searchQuery
-                  ? "Try a different search term"
-                  : "Create your first post to see it here"}
-              </p>
-              {!searchQuery && (
-                <Link href="/create">
-                  <Button className="mt-4 bg-ecco-navy hover:bg-ecco-navy-light">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Create Post
-                  </Button>
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </Tabs>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   );
 }
 
-export default function LibraryPage() {
+function KanbanColumn({
+  status,
+  label,
+  hint,
+  count,
+  children,
+}: {
+  status: Status;
+  label: string;
+  hint: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <LibraryContent />
-    </Suspense>
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex w-72 shrink-0 flex-col rounded-xl border bg-ecco-off-white transition-colors",
+        isOver ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-ecco-light px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLUMN_ACCENT[status] }} />
+          <span className="text-sm font-semibold text-ecco-primary">{label}</span>
+          <span className="text-xs text-ecco-muted">{count}</span>
+        </div>
+        <span className="text-[10px] text-ecco-muted">{hint}</span>
+      </div>
+      <div className="flex flex-1 flex-col gap-2 p-2 min-h-32">
+        {count === 0 && (
+          <p className="px-2 py-6 text-center text-[11px] text-ecco-muted">Drop posts here</p>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function KanbanCard(props: {
+  post: Post;
+  isEditing: boolean;
+  editText: string;
+  onEditTextChange: (v: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  saving: boolean;
+  onDelete: () => void;
+  onCopy: () => void;
+  copied: boolean;
+  refineOpen: boolean;
+  onToggleRefine: () => void;
+  refineText: string;
+  onRefineTextChange: (v: string) => void;
+  onRunRefine: () => void;
+  refining: boolean;
+}) {
+  const { post } = props;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: post.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-lg border border-ecco-light bg-white p-3 shadow-sm",
+        isDragging && "opacity-40"
+      )}
+    >
+      {props.isEditing ? (
+        <div className="space-y-2">
+          <Textarea
+            value={props.editText}
+            onChange={(e) => props.onEditTextChange(e.target.value)}
+            rows={6}
+            className="text-xs"
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={props.onCancelEdit} disabled={props.saving}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              className="bg-ecco-navy text-white hover:bg-ecco-navy-light"
+              onClick={props.onSaveEdit}
+              disabled={props.saving}
+            >
+              {props.saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-start gap-1">
+            <button
+              {...attributes}
+              {...listeners}
+              className="mt-0.5 cursor-grab text-ecco-muted hover:text-ecco-tertiary active:cursor-grabbing"
+              aria-label="Drag post"
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+            <p className="flex-1 text-xs text-ecco-primary whitespace-pre-wrap line-clamp-6">
+              {post.content}
+            </p>
+          </div>
+
+          <div className="mt-2 flex items-center justify-end gap-1 border-t border-ecco-light pt-2">
+            <IconBtn label="Refine with AI" onClick={props.onToggleRefine}>
+              <Sparkles className={cn("h-3.5 w-3.5", props.refineOpen && "text-ecco-accent")} />
+            </IconBtn>
+            <IconBtn label="Edit" onClick={props.onStartEdit}>
+              <Edit3 className="h-3.5 w-3.5" />
+            </IconBtn>
+            <IconBtn label="Copy" onClick={props.onCopy}>
+              {props.copied ? <Check className="h-3.5 w-3.5 text-ecco-success" /> : <Copy className="h-3.5 w-3.5" />}
+            </IconBtn>
+            <IconBtn label="Delete" onClick={props.onDelete}>
+              <Trash2 className="h-3.5 w-3.5 text-ecco-error" />
+            </IconBtn>
+          </div>
+
+          {props.refineOpen && (
+            <div className="mt-2 space-y-2 rounded-md bg-ecco-blue-pale p-2">
+              <Textarea
+                value={props.refineText}
+                onChange={(e) => props.onRefineTextChange(e.target.value)}
+                rows={2}
+                placeholder="Tell the AI how to revise this (e.g. 'make it punchier, add a stat')"
+                className="text-xs bg-white"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="bg-ecco-navy text-white hover:bg-ecco-navy-light"
+                  onClick={props.onRunRefine}
+                  disabled={props.refining || !props.refineText.trim()}
+                >
+                  {props.refining ? (
+                    <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Revising</>
+                  ) : (
+                    <><Sparkles className="mr-1.5 h-3.5 w-3.5" /> Revise</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function IconBtn({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="rounded-md p-1.5 text-ecco-tertiary hover:bg-ecco-off-white hover:text-ecco-primary"
+    >
+      {children}
+    </button>
   );
 }

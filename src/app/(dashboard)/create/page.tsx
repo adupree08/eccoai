@@ -27,10 +27,15 @@ import {
   MessageSquare,
   Share2,
   Heart,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePosts } from "@/hooks/use-posts";
 import { useBrandVoices } from "@/hooks/use-brand-voices";
+import { useContentPillars } from "@/hooks/use-content-pillars";
+import { PostImagePicker } from "@/components/create/post-image-picker";
+import { TemplatePicker } from "@/components/create/template-picker";
+import type { Template } from "@/hooks/use-templates";
 import { toast } from "sonner";
 
 const formats = [
@@ -129,6 +134,12 @@ function CreatePostContent() {
   const router = useRouter();
   const { createPost } = usePosts();
   const { brandVoices } = useBrandVoices();
+  const { pillars } = useContentPillars();
+  const [selectedPillar, setSelectedPillar] = useState<string>("none");
+  const [postImage, setPostImage] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [similarity, setSimilarity] = useState<"close" | "balanced" | "loose">("balanced");
 
   // Initialize from URL params (for RSS source)
   const sourceParam = searchParams.get("source");
@@ -250,6 +261,11 @@ function CreatePostContent() {
           tones: selectedTones.filter(t => t !== "None"),
           angles: selectedAngles.filter(a => a !== "None"),
           brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+          templateId: selectedTemplate?.id || null,
+          similarity,
+          pillar: selectedPillar !== "none"
+            ? (() => { const p = pillars.find((x) => x.id === selectedPillar); return p ? { name: p.name, description: p.description } : null; })()
+            : null,
           length: activeTab === "comment" ? "Short" : selectedLength,
           // Viral mode options
           viralMode,
@@ -397,6 +413,8 @@ function CreatePostContent() {
         source_type: activeTab as "idea" | "url" | "rss",
         source_url: activeTab === "url" ? urlInput : (activeTab === "rss" ? rssContent.url : null),
         brand_voice_id: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        pillar_id: selectedPillar !== "none" ? selectedPillar : null,
+        image_url: postImage,
         formats: selectedFormat !== "None" ? [selectedFormat] : [],
         tones: selectedTones.filter(t => t !== "None"),
         angles: selectedAngles.filter(a => a !== "None"),
@@ -430,6 +448,8 @@ function CreatePostContent() {
         source_type: activeTab as "idea" | "url" | "rss",
         source_url: activeTab === "url" ? urlInput : (activeTab === "rss" ? rssContent.url : null),
         brand_voice_id: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        pillar_id: selectedPillar !== "none" ? selectedPillar : null,
+        image_url: postImage,
         formats: selectedFormat !== "None" ? [selectedFormat] : [],
         tones: selectedTones.filter(t => t !== "None"),
         angles: selectedAngles.filter(a => a !== "None"),
@@ -476,28 +496,28 @@ function CreatePostContent() {
         <TabsList className="bg-white border border-ecco p-1 h-auto">
           <TabsTrigger
             value="idea"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <Lightbulb className="mr-2 h-4 w-4" />
             From Idea
           </TabsTrigger>
           <TabsTrigger
             value="url"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <Link2 className="mr-2 h-4 w-4" />
             From URL
           </TabsTrigger>
           <TabsTrigger
             value="rss"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <Rss className="mr-2 h-4 w-4" />
             From RSS
           </TabsTrigger>
           <TabsTrigger
             value="comment"
-            className="data-[state=active]:bg-ecco-navy data-[state=active]:text-white px-5 py-2.5"
+            className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-5 py-2.5"
           >
             <MessageCircle className="mr-2 h-4 w-4" />
             Comment
@@ -1252,6 +1272,69 @@ function CreatePostContent() {
                 </div>
 
                 {/* Voice Selection */}
+                {/* Template */}
+                <div>
+                  <p className="text-sm font-semibold text-ecco-blue mb-3">Template</p>
+                  {selectedTemplate ? (
+                    <div className="rounded-lg border border-ecco-accent bg-ecco-blue-pale p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-ecco-primary truncate">
+                          <LayoutTemplate className="h-3.5 w-3.5 text-ecco-accent shrink-0" />
+                          {selectedTemplate.name}
+                        </span>
+                        <button onClick={() => setSelectedTemplate(null)} aria-label="Remove template" className="text-ecco-muted hover:text-ecco-error">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <label className="mt-3 block text-[10px] uppercase tracking-wider text-ecco-muted">Similarity</label>
+                      <select
+                        value={similarity}
+                        onChange={(e) => setSimilarity(e.target.value as "close" | "balanced" | "loose")}
+                        className="mt-1 w-full rounded-lg border border-ecco bg-white px-3 py-2 text-sm text-ecco-primary"
+                      >
+                        <option value="close">Close (follow it tightly)</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="loose">Loose (just inspiration)</option>
+                      </select>
+                      <button onClick={() => setTemplatePickerOpen(true)} className="mt-2 text-xs font-medium text-ecco-accent hover:underline">
+                        Change template
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setTemplatePickerOpen(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-ecco bg-ecco-off-white px-3 py-3 text-sm text-ecco-tertiary hover:border-ecco-navy hover:text-ecco-primary"
+                    >
+                      <LayoutTemplate className="h-4 w-4" />
+                      Browse templates
+                    </button>
+                  )}
+                  <p className="text-[10px] text-ecco-muted mt-2 italic">Or leave off to use your default style</p>
+                </div>
+
+                <PostImagePicker value={postImage} onChange={setPostImage} />
+
+                <div>
+                  <p className="text-sm font-semibold text-ecco-blue mb-3">
+                    Content Pillar
+                  </p>
+                  <select
+                    value={selectedPillar}
+                    onChange={(e) => setSelectedPillar(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary"
+                  >
+                    <option value="none">None</option>
+                    {pillars.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-ecco-muted mt-2 italic">
+                    Manage pillars in Settings
+                  </p>
+                </div>
+
                 <div>
                   <p className="text-sm font-semibold text-ecco-blue mb-3">
                     Brand Voice
@@ -1277,6 +1360,13 @@ function CreatePostContent() {
           </div>
         </div>
       </Tabs>
+
+      <TemplatePicker
+        open={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        selectedId={selectedTemplate?.id || null}
+        onSelect={(t) => { setSelectedTemplate(t); setTemplatePickerOpen(false); }}
+      />
     </div>
   );
 }

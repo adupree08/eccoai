@@ -134,7 +134,15 @@ export default function FeedsPage() {
 
   // Save article for later
   const saveArticle = async (article: Article, feedId: string) => {
+    // user_id is NOT NULL with no default, so it must be sent explicitly.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Please sign in again to save articles");
+      return;
+    }
+
     const { error } = await supabase.from("saved_articles").insert({
+      user_id: user.id,
       article_id: article.id,
       feed_id: feedId,
       title: article.title,
@@ -179,7 +187,15 @@ export default function FeedsPage() {
 
   // Hide article from feed
   const hideArticle = async (articleId: string) => {
+    // user_id is NOT NULL with no default, so it must be sent explicitly.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Please sign in again to hide articles");
+      return;
+    }
+
     const { error } = await supabase.from("hidden_articles").insert({
+      user_id: user.id,
       article_id: articleId,
     });
 
@@ -194,6 +210,25 @@ export default function FeedsPage() {
       toast.success("Article hidden from feed");
       setHiddenArticleIds(prev => new Set(prev).add(articleId));
     }
+  };
+
+  // Permanent delete: removes the article row entirely (and, via cascade, any
+  // saved/hidden references). Different from hide, which just filters it out.
+  const deleteArticle = async (articleId: string, feedId: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Permanently delete this article? This cannot be undone.")) {
+      return;
+    }
+    const { error } = await supabase.from("articles").delete().eq("id", articleId);
+    if (error) {
+      toast.error("Could not delete the article");
+      return;
+    }
+    setFeedArticles(prev => ({
+      ...prev,
+      [feedId]: (prev[feedId] || []).filter(a => a.id !== articleId),
+    }));
+    setSavedArticles(prev => prev.filter(a => a.article_id !== articleId));
+    toast.success("Article deleted");
   };
 
   const toggleFeedExpand = async (feedId: string) => {
@@ -807,6 +842,19 @@ export default function FeedsPage() {
                             title="Hide from feed"
                           >
                             <EyeOff className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 bg-white/80 hover:bg-white text-ecco-muted hover:text-ecco-error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              deleteArticle(article.id, feed.id);
+                            }}
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                         <h4 className="text-sm font-semibold text-ecco-primary mb-2 line-clamp-2 pr-16">

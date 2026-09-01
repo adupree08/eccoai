@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { usePosts } from "@/hooks/use-posts";
 import { useBrandVoices } from "@/hooks/use-brand-voices";
+import { usePopularPosts } from "@/hooks/use-popular-posts";
 import { formatDistanceToNow } from "@/lib/utils";
 
 // Quick actions
@@ -49,6 +50,7 @@ const quickActions = [
 export default function DashboardPage() {
   const { posts, loading } = usePosts();
   const { brandVoices, loading: voicesLoading } = useBrandVoices();
+  const { popular } = usePopularPosts(6);
 
   // Calculate stats from actual posts
   const now = new Date();
@@ -338,6 +340,47 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* What's working now (populated from admin vertical research) */}
+      {popular.length > 0 && (
+        <Card className="border-ecco">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold text-ecco-primary">
+              What&apos;s working now
+            </CardTitle>
+            <span className="text-xs text-ecco-tertiary">Popular posts to learn from</span>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {popular.map((p) => (
+                <div key={p.id} className="rounded-lg border border-ecco-light p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-ecco-secondary truncate">
+                      {p.author_name || "LinkedIn creator"}
+                    </span>
+                    <span className="text-[11px] text-ecco-tertiary shrink-0">
+                      {p.likes.toLocaleString()} likes
+                    </span>
+                  </div>
+                  <p className="line-clamp-4 whitespace-pre-wrap text-sm text-ecco-primary">
+                    {p.content}
+                  </p>
+                  {p.post_url && (
+                    <a
+                      href={p.post_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-xs text-ecco-accent hover:underline"
+                    >
+                      View original
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
