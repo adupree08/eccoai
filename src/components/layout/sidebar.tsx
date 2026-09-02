@@ -11,6 +11,7 @@ import {
   Rss,
   PenSquare,
   Library,
+  ImageIcon,
   Calendar,
   BarChart3,
   Settings,
@@ -36,6 +37,11 @@ const navItems = [
     name: "Create Post",
     href: "/create",
     icon: PenSquare,
+  },
+  {
+    name: "Media",
+    href: "/media",
+    icon: ImageIcon,
   },
   {
     name: "Library",

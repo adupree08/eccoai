@@ -35,7 +35,6 @@ import { useBrandVoices } from "@/hooks/use-brand-voices";
 import { useContentPillars } from "@/hooks/use-content-pillars";
 import { PostImagePicker } from "@/components/create/post-image-picker";
 import { TemplatePicker } from "@/components/create/template-picker";
-import { OptionSection } from "@/components/create/option-section";
 import type { Template } from "@/hooks/use-templates";
 import { toast } from "sonner";
 
@@ -167,7 +166,6 @@ function CreatePostContent() {
   const [selectedFormat, setSelectedFormat] = useState<string>("None");
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
   const [selectedLength, setSelectedLength] = useState("Medium");
-  const [selectedBrandVoice, setSelectedBrandVoice] = useState<string>("none");
   // Viral mode state
   const [viralMode, setViralMode] = useState(false);
   const [selectedViralAngle, setSelectedViralAngle] = useState<string>("None");
@@ -261,7 +259,7 @@ function CreatePostContent() {
           format: selectedFormat !== "None" ? selectedFormat : null,
           tones: selectedTones.filter(t => t !== "None"),
           angles: selectedAngles.filter(a => a !== "None"),
-          brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+          brandVoiceId: brandVoices.find((v) => v.is_default)?.id ?? brandVoices[0]?.id ?? null,
           templateId: selectedTemplate?.id || null,
           similarity,
           pillar: selectedPillar !== "none"
@@ -346,7 +344,7 @@ function CreatePostContent() {
           editAction: action,
           format: selectedFormat !== "None" ? selectedFormat : null,
           tones: selectedTones.filter(t => t !== "None"),
-          brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+          brandVoiceId: brandVoices.find((v) => v.is_default)?.id ?? brandVoices[0]?.id ?? null,
         }),
       });
 
@@ -383,7 +381,7 @@ function CreatePostContent() {
           customInstruction: aiChatInput,
           format: selectedFormat !== "None" ? selectedFormat : null,
           tones: selectedTones.filter(t => t !== "None"),
-          brandVoiceId: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+          brandVoiceId: brandVoices.find((v) => v.is_default)?.id ?? brandVoices[0]?.id ?? null,
         }),
       });
 
@@ -413,7 +411,7 @@ function CreatePostContent() {
         content: post.content,
         source_type: activeTab as "idea" | "url" | "rss",
         source_url: activeTab === "url" ? urlInput : (activeTab === "rss" ? rssContent.url : null),
-        brand_voice_id: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        brand_voice_id: brandVoices.find((v) => v.is_default)?.id ?? brandVoices[0]?.id ?? null,
         pillar_id: selectedPillar !== "none" ? selectedPillar : null,
         image_url: postImage,
         formats: selectedFormat !== "None" ? [selectedFormat] : [],
@@ -448,7 +446,7 @@ function CreatePostContent() {
         content: post.content,
         source_type: activeTab as "idea" | "url" | "rss",
         source_url: activeTab === "url" ? urlInput : (activeTab === "rss" ? rssContent.url : null),
-        brand_voice_id: selectedBrandVoice !== "none" ? selectedBrandVoice : null,
+        brand_voice_id: brandVoices.find((v) => v.is_default)?.id ?? brandVoices[0]?.id ?? null,
         pillar_id: selectedPillar !== "none" ? selectedPillar : null,
         image_url: postImage,
         formats: selectedFormat !== "None" ? [selectedFormat] : [],
@@ -494,6 +492,7 @@ function CreatePostContent() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <TabsList className="bg-white border border-ecco p-1 h-auto">
           <TabsTrigger
             value="idea"
@@ -524,9 +523,21 @@ function CreatePostContent() {
             Comment
           </TabsTrigger>
         </TabsList>
+          <button
+            type="button"
+            onClick={() => setViralMode(!viralMode)}
+            className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors", viralMode ? "border-amber-500 bg-amber-50 text-amber-700" : "border-ecco bg-white text-ecco-tertiary hover:border-amber-300")}
+          >
+            <Zap className={cn("h-4 w-4", viralMode ? "fill-amber-500 text-amber-500" : "text-amber-400")} />
+            Viral Mode
+            <span className={cn("relative inline-flex h-4 w-7 items-center rounded-full transition-colors", viralMode ? "bg-amber-500" : "bg-gray-300")}>
+              <span className={cn("inline-block h-3 w-3 transform rounded-full bg-white transition-transform", viralMode ? "translate-x-3.5" : "translate-x-0.5")} />
+            </span>
+          </button>
+        </div>
 
         {/* Content Layout */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="max-w-3xl mx-auto">
           {/* Main Input Section */}
           <div className="space-y-6">
             <TabsContent value="idea" className="m-0">
@@ -544,28 +555,6 @@ function CreatePostContent() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
-                    <p className="text-xs text-ecco-tertiary">
-                      Generate 2 variations
-                    </p>
-                    <Button
-                      onClick={handleGenerate}
-                      disabled={!canGenerate() || isGenerating}
-                      className="bg-ecco-navy hover:bg-ecco-navy-light"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          Generate Posts
-                        </>
-                      )}
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -632,28 +621,6 @@ function CreatePostContent() {
                     </>
                   )}
 
-                  <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
-                    <p className="text-xs text-ecco-tertiary">
-                      Generate 2 variations
-                    </p>
-                    <Button
-                      onClick={handleGenerate}
-                      disabled={!canGenerate() || isGenerating}
-                      className="bg-ecco-navy hover:bg-ecco-navy-light"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          Generate Posts
-                        </>
-                      )}
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -698,28 +665,6 @@ function CreatePostContent() {
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
-                        <p className="text-xs text-ecco-tertiary">
-                          Generate 2 variations
-                        </p>
-                        <Button
-                          onClick={handleGenerate}
-                          disabled={!canGenerate() || isGenerating}
-                          className="bg-ecco-navy hover:bg-ecco-navy-light"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              Generate Posts
-                            </>
-                          )}
-                        </Button>
-                      </div>
                     </>
                   ) : (
                     <>
@@ -777,28 +722,6 @@ function CreatePostContent() {
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-ecco-light">
-                    <p className="text-xs text-ecco-tertiary">
-                      Generate 2 comment variations
-                    </p>
-                    <Button
-                      onClick={handleGenerate}
-                      disabled={!canGenerate() || isGenerating}
-                      className="bg-ecco-navy hover:bg-ecco-navy-light"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          Generate Comments
-                        </>
-                      )}
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
 
@@ -862,6 +785,94 @@ function CreatePostContent() {
                 </div>
               )}
             </TabsContent>
+
+            {/* Media + Options + Generate */}
+            <div className="space-y-5 mt-6">
+              <div>
+                <p className="text-sm font-semibold text-ecco-blue mb-2">Media</p>
+                <PostImagePicker value={postImage} onChange={setPostImage} />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Template</label>
+                  {selectedTemplate ? (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-ecco-accent bg-ecco-blue-pale px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-ecco-primary truncate">
+                        <LayoutTemplate className="h-3.5 w-3.5 text-ecco-accent shrink-0" />{selectedTemplate.name}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <select value={similarity} onChange={(e) => setSimilarity(e.target.value as "close" | "balanced" | "loose")} className="rounded-md border border-ecco bg-white px-2 py-1 text-xs text-ecco-primary">
+                          <option value="close">Close</option>
+                          <option value="balanced">Balanced</option>
+                          <option value="loose">Loose</option>
+                        </select>
+                        <button onClick={() => setTemplatePickerOpen(true)} className="text-xs font-medium text-ecco-accent hover:underline">Change</button>
+                        <button onClick={() => setSelectedTemplate(null)} aria-label="Remove template" className="text-ecco-muted hover:text-ecco-error"><X className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setTemplatePickerOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-ecco bg-ecco-off-white px-3 py-2 text-sm text-ecco-tertiary hover:border-ecco-navy hover:text-ecco-primary">
+                      <LayoutTemplate className="h-4 w-4" /> Browse 50+ templates
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Tone</label>
+                  <select value={selectedTones[0] ?? "None"} onChange={(e) => setSelectedTones(e.target.value === "None" ? [] : [e.target.value])} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
+                    {tones.map((t) => (<option key={t} value={t}>{t}</option>))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Length</label>
+                  <select value={selectedLength} onChange={(e) => setSelectedLength(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
+                    {lengths.map((l) => (<option key={l.label} value={l.label}>{l.label}</option>))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Content Pillar</label>
+                  <select value={selectedPillar} onChange={(e) => setSelectedPillar(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
+                    <option value="none">None</option>
+                    {pillars.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                  </select>
+                </div>
+              </div>
+
+              {viralMode && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                  <div>
+                    <p className="text-xs font-medium text-ecco-secondary mb-2">Optimize for</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {engagementGoals.map((goal) => {
+                        const Icon = goal.icon;
+                        const isSelected = selectedEngagementGoal === goal.value;
+                        return (
+                          <button key={goal.value} onClick={() => setSelectedEngagementGoal(goal.value)} className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors", isSelected ? "bg-white border-amber-500 text-amber-700" : "bg-white border-gray-200 text-ecco-tertiary hover:border-amber-300")}>
+                            <Icon className={cn("h-3.5 w-3.5", isSelected ? "text-amber-500" : "")} /><span className="text-xs font-medium">{goal.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-ecco-secondary mb-2">Viral Angle</p>
+                    <select value={selectedViralAngle} onChange={(e) => setSelectedViralAngle(e.target.value)} className="w-full px-3 py-2 text-xs border border-amber-200 rounded-lg bg-white text-ecco-primary">
+                      {viralAngles.map((angle) => (<option key={angle.value} value={angle.value}>{angle.label}</option>))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-ecco-tertiary">{activeTab === "comment" ? "Generate 2 comment variations" : "Generate 2 post variations"}</p>
+                <Button onClick={handleGenerate} disabled={!canGenerate() || isGenerating} className="bg-ecco-navy hover:bg-ecco-navy-light">
+                  {isGenerating ? (<><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Generating...</>) : (<><Sparkles className="mr-2 h-4 w-4" />{activeTab === "comment" ? "Generate Comments" : "Generate Posts"}</>)}
+                </Button>
+              </div>
+            </div>
 
             {/* Generated Posts */}
             {generatedPosts.length > 0 && (
@@ -1046,211 +1057,7 @@ function CreatePostContent() {
             )}
           </div>
 
-          {/* Side Panel - Format, Tone & Angle */}
-          <div className="space-y-6">
-            <Card className="border-ecco sticky top-8">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-sm font-semibold text-ecco-primary">
-                  Style Options
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="py-0">
-                {/* Template */}
-                <OptionSection title="Template" summary={selectedTemplate ? selectedTemplate.name : "None"} defaultOpen>
-                  {selectedTemplate ? (
-                    <div className="rounded-lg border border-ecco-accent bg-ecco-blue-pale p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-ecco-primary truncate">
-                          <LayoutTemplate className="h-3.5 w-3.5 text-ecco-accent shrink-0" />
-                          {selectedTemplate.name}
-                        </span>
-                        <button onClick={() => setSelectedTemplate(null)} aria-label="Remove template" className="text-ecco-muted hover:text-ecco-error">
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <label className="mt-3 block text-[10px] uppercase tracking-wider text-ecco-muted">Similarity</label>
-                      <select
-                        value={similarity}
-                        onChange={(e) => setSimilarity(e.target.value as "close" | "balanced" | "loose")}
-                        className="mt-1 w-full rounded-lg border border-ecco bg-white px-3 py-2 text-sm text-ecco-primary"
-                      >
-                        <option value="close">Close (follow it tightly)</option>
-                        <option value="balanced">Balanced</option>
-                        <option value="loose">Loose (just inspiration)</option>
-                      </select>
-                      <button onClick={() => setTemplatePickerOpen(true)} className="mt-2 text-xs font-medium text-ecco-accent hover:underline">
-                        Change template
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setTemplatePickerOpen(true)}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-ecco bg-ecco-off-white px-3 py-3 text-sm text-ecco-tertiary hover:border-ecco-navy hover:text-ecco-primary"
-                    >
-                      <LayoutTemplate className="h-4 w-4" />
-                      Browse 50+ templates
-                    </button>
-                  )}
-                </OptionSection>
 
-                {/* Brand Voice */}
-                <OptionSection title="Brand Voice" summary={brandVoices.find((v) => v.id === selectedBrandVoice)?.name ?? "Default"}>
-                  <select
-                    value={selectedBrandVoice}
-                    onChange={(e) => setSelectedBrandVoice(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary"
-                  >
-                    <option value="none">Default Voice</option>
-                    {brandVoices.map((voice) => (
-                      <option key={voice.id} value={voice.id}>{voice.name}</option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-ecco-muted mt-2 italic">Configure your brand voice in Settings</p>
-                </OptionSection>
-
-                {/* Content Pillar */}
-                <OptionSection title="Content Pillar" summary={selectedPillar === "none" ? "None" : (pillars.find((p) => p.id === selectedPillar)?.name ?? "None")}>
-                  <select
-                    value={selectedPillar}
-                    onChange={(e) => setSelectedPillar(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary"
-                  >
-                    <option value="none">None</option>
-                    {pillars.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-ecco-muted mt-2 italic">Manage pillars in Settings</p>
-                </OptionSection>
-
-                {/* Format */}
-                <OptionSection title="Format" summary={selectedFormat}>
-                  <div className="flex flex-wrap gap-2">
-                    {formats.map((format) => {
-                      const isSelected = selectedFormat === format;
-                      return (
-                        <button key={format} onClick={() => setSelectedFormat(format)}
-                          className={cn("px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                            isSelected ? "bg-ecco-navy text-white border-ecco-navy" : "bg-gray-100 text-ecco-tertiary border-gray-200 hover:border-ecco-navy")}>
-                          {format}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </OptionSection>
-
-                {/* Tone */}
-                <OptionSection title="Tone" summary={selectedTones.length ? `${selectedTones.length} selected` : "None"}>
-                  <div className="flex flex-wrap gap-2">
-                    {tones.map((tone) => {
-                      const isNone = tone === "None";
-                      const isSelected = isNone ? selectedTones.length === 0 : selectedTones.includes(tone);
-                      return (
-                        <button key={tone}
-                          onClick={() => {
-                            if (isNone) setSelectedTones([]);
-                            else if (isSelected) setSelectedTones(selectedTones.filter((t) => t !== tone));
-                            else setSelectedTones([...selectedTones, tone]);
-                          }}
-                          className={cn("px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                            isSelected ? "bg-ecco-navy text-white border-ecco-navy" : "bg-gray-100 text-ecco-tertiary border-gray-200 hover:border-ecco-navy")}>
-                          {tone}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </OptionSection>
-
-                {/* Angle */}
-                <OptionSection title="Angle" summary={selectedAngles.length ? `${selectedAngles.length} selected` : "None"}>
-                  <div className="flex flex-wrap gap-2">
-                    {angles.map((angle) => {
-                      const isNone = angle === "None";
-                      const isSelected = isNone ? selectedAngles.length === 0 : selectedAngles.includes(angle);
-                      return (
-                        <button key={angle}
-                          onClick={() => {
-                            if (isNone) setSelectedAngles([]);
-                            else if (isSelected) setSelectedAngles(selectedAngles.filter((a) => a !== angle));
-                            else setSelectedAngles([...selectedAngles, angle]);
-                          }}
-                          className={cn("px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                            isSelected ? "bg-ecco-navy text-white border-ecco-navy" : "bg-gray-100 text-ecco-tertiary border-gray-200 hover:border-ecco-navy")}>
-                          {angle}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </OptionSection>
-
-                {/* Length */}
-                <OptionSection title="Length" summary={selectedLength}>
-                  <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                    {lengths.map((length) => (
-                      <button key={length.label} onClick={() => setSelectedLength(length.label)}
-                        className={cn("flex-1 px-4 py-2 text-xs font-medium rounded-md transition-colors",
-                          selectedLength === length.label ? "bg-white text-ecco-navy shadow-sm" : "text-ecco-tertiary hover:text-ecco-primary")}>
-                        {length.label}
-                      </button>
-                    ))}
-                  </div>
-                </OptionSection>
-
-                {/* Image */}
-                <OptionSection title="Post Image" summary={postImage ? "Added" : "None"}>
-                  <PostImagePicker value={postImage} onChange={setPostImage} />
-                </OptionSection>
-
-                {/* Viral Mode */}
-                <OptionSection title="Viral Mode" summary={viralMode ? "On" : "Off"}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Zap className={cn("h-5 w-5", viralMode ? "text-amber-500 fill-amber-500" : "text-amber-400")} />
-                      <p className="text-sm font-semibold text-ecco-blue">Viral Mode</p>
-                    </div>
-                    <button onClick={() => setViralMode(!viralMode)}
-                      className={cn("relative inline-flex h-6 w-11 items-center rounded-full transition-colors", viralMode ? "bg-amber-500" : "bg-gray-200")}>
-                      <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", viralMode ? "translate-x-6" : "translate-x-1")} />
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-ecco-muted">Optimize for maximum LinkedIn engagement</p>
-                  {viralMode && (
-                    <div className="mt-4 space-y-4">
-                      <div>
-                        <p className="text-xs font-medium text-ecco-secondary mb-2">Optimize for</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {engagementGoals.map((goal) => {
-                            const Icon = goal.icon;
-                            const isSelected = selectedEngagementGoal === goal.value;
-                            return (
-                              <button key={goal.value} onClick={() => setSelectedEngagementGoal(goal.value)}
-                                className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors",
-                                  isSelected ? "bg-amber-50 border-amber-500 text-amber-700" : "bg-white border-gray-200 text-ecco-tertiary hover:border-amber-300")}>
-                                <Icon className={cn("h-3.5 w-3.5", isSelected ? "text-amber-500" : "")} />
-                                <span className="text-xs font-medium">{goal.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-ecco-secondary mb-2">Viral Angle</p>
-                        <select value={selectedViralAngle} onChange={(e) => setSelectedViralAngle(e.target.value)}
-                          className="w-full px-3 py-2 text-xs border border-amber-200 rounded-lg bg-amber-50 text-ecco-primary">
-                          {viralAngles.map((angle) => (
-                            <option key={angle.value} value={angle.value}>{angle.label}</option>
-                          ))}
-                        </select>
-                        {selectedViralAngle !== "None" && (
-                          <p className="text-[10px] text-amber-600 mt-1.5">{viralAngles.find((a) => a.value === selectedViralAngle)?.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </OptionSection>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </Tabs>
 

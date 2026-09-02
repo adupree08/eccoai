@@ -140,13 +140,13 @@ export async function POST(request: Request) {
         if (tpl) {
           const strictness =
             similarity === "close"
-              ? "Follow this structure closely: keep its hook style, section shape, and pacing. Only the topic and specifics change."
+              ? "Follow the template's structure and rhythm closely (its hook style, section shape, and pacing), but write every line in your own fresh, original wording."
               : similarity === "loose"
-                ? "Use this structure as loose inspiration. Borrow what fits and feel free to depart from it."
-                : "Follow this structure while adapting it naturally to the topic. Keep its overall shape, but don't be rigid.";
-          systemPromptWithPillar += `\n\nPOST TEMPLATE — "${tpl.name}". ${strictness}\nStructure: ${tpl.description}`;
+                ? "Use the template only as loose inspiration. Borrow the shape where it helps and feel free to depart from it, always in original wording."
+                : "Follow the template's overall shape while adapting it naturally to the topic, expressed entirely in your own words.";
+          systemPromptWithPillar += `\n\nPOST TEMPLATE — "${tpl.name}". ${strictness}\nStructure to emulate: ${tpl.description}`;
           if (tpl.skeleton) {
-            systemPromptWithPillar += `\nSkeleton (replace the {bracketed} parts with real, specific content; never leave a bracket in the output):\n${tpl.skeleton}`;
+            systemPromptWithPillar += `\n\nUse this skeleton ONLY as a structural blueprint for the beats and flow. Do NOT reuse the template's literal sentences or phrases; rewrite everything in fresh, original language. Replace each {bracketed} part with specific content and never leave a bracket in the output:\n${tpl.skeleton}`;
           }
         }
       } else {
