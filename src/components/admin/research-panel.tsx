@@ -4,28 +4,48 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Sparkles, Loader2, Check, Trash2, X, Star, Heart, MessageCircle, Repeat2 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Search, Sparkles, Loader2, Check, Trash2, X, Star, Heart, MessageCircle, Repeat2, TrendingUp, Users, ExternalLink, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/lib/supabase/types";
 import { toast } from "sonner";
 
 type Structure = Database["public"]["Tables"]["post_structures"]["Row"];
 type PopularPost = Database["public"]["Tables"]["popular_posts"]["Row"];
+type Prospect = Database["public"]["Tables"]["icp_prospects"]["Row"];
+
+const RANGES = [
+  { value: "today", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+  { value: "all", label: "All time" },
+];
+
+const PROSPECT_STATUSES = ["new", "requested", "connected", "skipped"];
 
 export function AdminResearchPanel() {
   const supabase = createClient();
+
+  // ---- Popular posts research ----
   const [vertical, setVertical] = useState("");
   const [keywords, setKeywords] = useState("");
+  const [range, setRange] = useState("week");
+  const [sortBy, setSortBy] = useState("relevance");
   const [searching, setSearching] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [structures, setStructures] = useState<Structure[]>([]);
   const [pool, setPool] = useState<PopularPost[]>([]);
 
+  // ---- ICP ----
+  const [icpQuery, setIcpQuery] = useState("");
+  const [icpTitles, setIcpTitles] = useState("");
+  const [icpLocations, setIcpLocations] = useState("");
+  const [icpWithEmail, setIcpWithEmail] = useState(true);
+  const [icpSearching, setIcpSearching] = useState(false);
+  const [prospects, setProspects] = useState<Prospect[]>([]);
+
   const loadStructures = useCallback(async () => {
-    const { data } = await supabase
-      .from("post_structures")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await supabase.from("post_structures").select("*").order("created_at", { ascending: false });
     setStructures(data || []);
   }, [supabase]);
 
@@ -35,34 +55,20 @@ export function AdminResearchPanel() {
       .select("*")
       .order("featured", { ascending: false })
       .order("likes", { ascending: false })
-      .limit(100);
+      .limit(200);
     setPool(data || []);
+  }, [supabase]);
+
+  const loadProspects = useCallback(async () => {
+    const { data } = await supabase.from("icp_prospects").select("*").order("created_at", { ascending: false }).limit(500);
+    setProspects(data || []);
   }, [supabase]);
 
   useEffect(() => {
     loadStructures();
     loadPool();
-  }, [loadStructures, loadPool]);
-
-  const toggleFeatured = async (p: PopularPost) => {
-    const next = !p.featured;
-    const { error } = await supabase
-      .from("popular_posts")
-      .update({ featured: next, featured_at: next ? new Date().toISOString() : null })
-      .eq("id", p.id);
-    if (error) {
-      toast.error("Could not update");
-      return;
-    }
-    setPool((prev) => prev.map((x) => (x.id === p.id ? { ...x, featured: next } : x)));
-    toast.success(next ? "Shared to Popular Posts" : "Removed from Popular Posts");
-  };
-
-  const removePost = async (id: string) => {
-    const { error } = await supabase.from("popular_posts").delete().eq("id", id);
-    if (error) toast.error("Could not delete");
-    else setPool((prev) => prev.filter((x) => x.id !== id));
-  };
+    loadProspects();
+  }, [loadStructures, loadPool, loadProspects]);
 
   const runSearch = async () => {
     if (!vertical.trim() && !keywords.trim()) {
@@ -74,7 +80,7 @@ export function AdminResearchPanel() {
       const res = await fetch("/api/admin/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vertical: vertical.trim(), keywords: keywords.trim() || vertical.trim() }),
+        body: JSON.stringify({ vertical: vertical.trim(), keywords: keywords.trim() || vertical.trim(), range, sortBy }),
       });
       const data = await res.json();
       if (!res.ok) toast.error(data.error || "Research failed");
@@ -107,136 +113,291 @@ export function AdminResearchPanel() {
   };
 
   const toggleApprove = async (s: Structure) => {
-    const { error } = await supabase
-      .from("post_structures")
-      .update({ approved: !s.approved })
-      .eq("id", s.id);
-    if (error) {
-      toast.error("Could not update");
-      return;
-    }
+    const { error } = await supabase.from("post_structures").update({ approved: !s.approved }).eq("id", s.id);
+    if (error) return toast.error("Could not update");
     setStructures((prev) => prev.map((x) => (x.id === s.id ? { ...x, approved: !x.approved } : x)));
   };
 
-  const remove = async (id: string) => {
+  const removeStructure = async (id: string) => {
     const { error } = await supabase.from("post_structures").delete().eq("id", id);
     if (error) toast.error("Could not delete");
     else setStructures((prev) => prev.filter((x) => x.id !== id));
   };
 
+  const toggleFeatured = async (p: PopularPost) => {
+    const next = !p.featured;
+    const { error } = await supabase
+      .from("popular_posts")
+      .update({ featured: next, featured_at: next ? new Date().toISOString() : null })
+      .eq("id", p.id);
+    if (error) return toast.error("Could not update");
+    setPool((prev) => prev.map((x) => (x.id === p.id ? { ...x, featured: next } : x)));
+    toast.success(next ? "Shared to Popular Posts" : "Removed from Popular Posts");
+  };
+
+  const removePost = async (id: string) => {
+    const { error } = await supabase.from("popular_posts").delete().eq("id", id);
+    if (error) toast.error("Could not delete");
+    else setPool((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const runIcp = async () => {
+    if (!icpQuery.trim() && !icpTitles.trim()) {
+      toast.error("Enter a search query or job title");
+      return;
+    }
+    setIcpSearching(true);
+    try {
+      const res = await fetch("/api/admin/icp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          searchQuery: icpQuery.trim(),
+          jobTitles: icpTitles.trim(),
+          locations: icpLocations.trim(),
+          withEmail: icpWithEmail,
+          label: icpQuery.trim() || icpTitles.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) toast.error(data.error || "ICP search failed");
+      else {
+        toast.success(`Pulled ${data.inserted} prospects`);
+        loadProspects();
+      }
+    } catch {
+      toast.error("ICP request failed");
+    } finally {
+      setIcpSearching(false);
+    }
+  };
+
+  const setProspectStatus = async (p: Prospect, status: string) => {
+    const { error } = await supabase.from("icp_prospects").update({ status }).eq("id", p.id);
+    if (error) return toast.error("Could not update");
+    setProspects((prev) => prev.map((x) => (x.id === p.id ? { ...x, status } : x)));
+  };
+
+  const removeProspect = async (id: string) => {
+    const { error } = await supabase.from("icp_prospects").delete().eq("id", id);
+    if (error) toast.error("Could not delete");
+    else setProspects((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
+  const featured = pool.filter((p) => p.featured);
+  const tabTrigger = "data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-4 py-2";
+
   return (
     <Card className="border-ecco">
       <CardHeader>
-        <CardTitle className="text-base font-semibold text-ecco-primary">Vertical Research</CardTitle>
+        <CardTitle className="text-base font-semibold text-ecco-primary">Research &amp; Growth</CardTitle>
         <CardDescription className="text-ecco-tertiary">
-          Pull popular posts in your vertical (admin only), then learn reusable writing structures from them.
+          Admin-only. Pull popular posts, choose which to publish, and build an ICP outreach list.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Search */}
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <Input placeholder="Vertical (e.g. femtech)" value={vertical} onChange={(e) => setVertical(e.target.value)} />
-          <Input placeholder="Keywords (comma separated)" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
-          <Button onClick={runSearch} disabled={searching} className="bg-ecco-navy hover:bg-ecco-navy-light text-white">
-            {searching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-            Search
-          </Button>
-        </div>
+      <CardContent>
+        <Tabs defaultValue="popular">
+          <TabsList className="mb-5 bg-ecco-off-white">
+            <TabsTrigger value="popular" className={tabTrigger}><Search className="mr-2 h-4 w-4" />Popular Posts</TabsTrigger>
+            <TabsTrigger value="live" className={tabTrigger}><TrendingUp className="mr-2 h-4 w-4" />Pushed Live {featured.length > 0 && `(${featured.length})`}</TabsTrigger>
+            <TabsTrigger value="icp" className={tabTrigger}><Users className="mr-2 h-4 w-4" />ICP Prospects</TabsTrigger>
+          </TabsList>
 
-        {/* Research pool — choose which posts go on the public Popular Posts page */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-ecco-primary">
-              Research pool {pool.length > 0 && `(${pool.filter((p) => p.featured).length} shared)`}
-            </p>
-            <p className="text-xs text-ecco-muted">Star a post to show it on the users&apos; Popular Posts page</p>
-          </div>
-          {pool.length === 0 && (
-            <p className="text-sm text-ecco-muted">Nothing yet. Run a search to pull posts.</p>
-          )}
-          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-            {pool.map((p) => (
-              <div key={p.id} className={`rounded-lg border p-3 ${p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    {(p.author_name || p.author_headline) && (
-                      <p className="text-xs font-medium text-ecco-primary truncate">
-                        {p.author_name}{p.author_headline ? ` · ${p.author_headline}` : ""}
-                      </p>
-                    )}
-                    <p className="mt-1 text-sm text-ecco-secondary whitespace-pre-wrap line-clamp-4">{p.content}</p>
-                    <div className="mt-2 flex items-center gap-3 text-[11px] text-ecco-tertiary">
-                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{p.likes}</span>
-                      <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{p.comments}</span>
-                      <span className="flex items-center gap-1"><Repeat2 className="h-3 w-3" />{p.reposts}</span>
-                      {p.vertical && <span className="rounded bg-ecco-off-white px-1.5 py-0.5">{p.vertical}</span>}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant={p.featured ? "default" : "outline"}
-                      className={p.featured ? "bg-ecco-accent text-white" : ""}
-                      onClick={() => toggleFeatured(p)}
-                    >
-                      <Star className={`mr-1 h-3.5 w-3.5 ${p.featured ? "fill-white" : ""}`} />
-                      {p.featured ? "Shared" : "Share"}
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-ecco-error" onClick={() => removePost(p.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+          {/* ---------- POPULAR POSTS ---------- */}
+          <TabsContent value="popular" className="space-y-6 m-0">
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input placeholder="Vertical (e.g. femtech)" value={vertical} onChange={(e) => setVertical(e.target.value)} />
+                <Input placeholder="Keywords (comma separated)" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Extract */}
-        <div className="flex items-center justify-between rounded-lg bg-ecco-off-white p-3">
-          <p className="text-sm text-ecco-tertiary">Distill writing structures from the research so far</p>
-          <Button variant="outline" onClick={extractStructures} disabled={extracting}>
-            {extracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Extract structures
-          </Button>
-        </div>
-
-        {/* Structures list */}
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-ecco-primary">
-            Writing structures {structures.length > 0 && `(${structures.filter((s) => s.approved).length} approved)`}
-          </p>
-          {structures.length === 0 && (
-            <p className="text-sm text-ecco-muted">None yet. Run a search, then extract structures.</p>
-          )}
-          {structures.map((s) => (
-            <div key={s.id} className="rounded-lg border border-ecco-light p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ecco-primary">{s.name}</p>
-                  <p className="text-xs text-ecco-tertiary">{s.description}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant={s.approved ? "default" : "outline"}
-                    className={s.approved ? "bg-ecco-success text-white" : ""}
-                    onClick={() => toggleApprove(s)}
-                  >
-                    {s.approved ? <><Check className="mr-1 h-3.5 w-3.5" /> Approved</> : "Approve"}
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-ecco-error" onClick={() => remove(s.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select value={range} onChange={(e) => setRange(e.target.value)} className="rounded-lg border border-ecco bg-white px-3 py-2 text-sm text-ecco-primary">
+                  {RANGES.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                </select>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-lg border border-ecco bg-white px-3 py-2 text-sm text-ecco-primary">
+                  <option value="relevance">Most relevant</option>
+                  <option value="date">Most recent</option>
+                </select>
+                <Button onClick={runSearch} disabled={searching} className="bg-ecco-navy hover:bg-ecco-navy-light text-white">
+                  {searching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                  Search
+                </Button>
               </div>
             </div>
-          ))}
-        </div>
-        <p className="flex items-center gap-1 text-[11px] text-ecco-muted">
-          <X className="h-3 w-3" /> LinkedIn scraping is against LinkedIn ToS. Admin research use only.
-        </p>
+
+            {/* Research pool */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-ecco-primary">Research pool {pool.length > 0 && `(${featured.length} shared)`}</p>
+                <p className="text-xs text-ecco-muted">Star a post to publish it to the users&apos; Popular Posts page</p>
+              </div>
+              {pool.length === 0 && <p className="text-sm text-ecco-muted">Nothing yet. Run a search to pull posts.</p>}
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                {pool.map((p) => (
+                  <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} />
+                ))}
+              </div>
+            </div>
+
+            {/* Extract structures */}
+            <div className="flex items-center justify-between rounded-lg bg-ecco-off-white p-3">
+              <p className="text-sm text-ecco-tertiary">Distill reusable writing structures from the research so far</p>
+              <Button variant="outline" onClick={extractStructures} disabled={extracting}>
+                {extracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Extract structures
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-ecco-primary">
+                Writing structures {structures.length > 0 && `(${structures.filter((s) => s.approved).length} approved)`}
+              </p>
+              {structures.length === 0 && <p className="text-sm text-ecco-muted">None yet. Run a search, then extract structures.</p>}
+              {structures.map((s) => (
+                <div key={s.id} className="rounded-lg border border-ecco-light p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ecco-primary">{s.name}</p>
+                      <p className="text-xs text-ecco-tertiary">{s.description}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button size="sm" variant={s.approved ? "default" : "outline"} className={s.approved ? "bg-ecco-success text-white" : ""} onClick={() => toggleApprove(s)}>
+                        {s.approved ? <><Check className="mr-1 h-3.5 w-3.5" /> Approved</> : "Approve"}
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-ecco-error" onClick={() => removeStructure(s.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="flex items-center gap-1 text-[11px] text-ecco-muted">
+              <X className="h-3 w-3" /> LinkedIn scraping is against LinkedIn ToS. Admin research use only.
+            </p>
+          </TabsContent>
+
+          {/* ---------- PUSHED LIVE ---------- */}
+          <TabsContent value="live" className="space-y-3 m-0">
+            <p className="text-sm text-ecco-tertiary">These are the posts users currently see on their Popular Posts page. Unstar to pull one back into research.</p>
+            {featured.length === 0 && <p className="text-sm text-ecco-muted">Nothing published yet. Star posts in the Popular Posts tab.</p>}
+            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+              {featured.map((p) => (
+                <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} />
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* ---------- ICP ---------- */}
+          <TabsContent value="icp" className="space-y-6 m-0">
+            <div className="space-y-3">
+              <Input placeholder="Search query (e.g. Founder, Head of Marketing)" value={icpQuery} onChange={(e) => setIcpQuery(e.target.value)} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input placeholder="Job titles (comma separated)" value={icpTitles} onChange={(e) => setIcpTitles(e.target.value)} />
+                <Input placeholder="Locations (e.g. United States)" value={icpLocations} onChange={(e) => setIcpLocations(e.target.value)} />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-ecco-secondary">
+                  <input type="checkbox" checked={icpWithEmail} onChange={(e) => setIcpWithEmail(e.target.checked)} className="h-4 w-4" />
+                  Find emails (costs more)
+                </label>
+                <Button onClick={runIcp} disabled={icpSearching} className="bg-ecco-navy hover:bg-ecco-navy-light text-white">
+                  {icpSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Users className="mr-2 h-4 w-4" />}
+                  Find prospects
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-ecco-primary">Prospects {prospects.length > 0 && `(${prospects.length})`}</p>
+              {prospects.length === 0 && <p className="text-sm text-ecco-muted">No prospects yet. Run a search to build your list.</p>}
+              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                {prospects.map((p) => (
+                  <div key={p.id} className="rounded-lg border border-ecco-light p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ecco-primary truncate">{p.full_name || "Unknown"}</p>
+                        {p.headline && <p className="text-xs text-ecco-tertiary line-clamp-2">{p.headline}</p>}
+                        <p className="mt-1 text-[11px] text-ecco-muted">
+                          {[p.current_title, p.current_company, p.location].filter(Boolean).join(" · ")}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {p.profile_url && (
+                            <a href={p.profile_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-ecco-accent hover:underline">
+                              <ExternalLink className="h-3 w-3" /> Profile
+                            </a>
+                          )}
+                          {p.email && (
+                            <button onClick={() => copy(p.email!, "Email")} className="inline-flex items-center gap-1 text-xs text-ecco-accent hover:underline">
+                              <Copy className="h-3 w-3" /> {p.email}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <select value={p.status} onChange={(e) => setProspectStatus(p, e.target.value)} className="rounded-md border border-ecco bg-white px-2 py-1 text-xs text-ecco-primary capitalize">
+                          {PROSPECT_STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
+                        </select>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-ecco-error" onClick={() => removeProspect(p.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p className="flex items-center gap-1 text-[11px] text-ecco-muted">
+              <X className="h-3 w-3" /> Prospect data is admin-only and never shown to users. Send connection requests and outreach yourself, within LinkedIn&apos;s limits.
+            </p>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
+  );
+}
+
+function PoolRow({ p, onToggle, onRemove }: { p: PopularPost; onToggle: (p: PopularPost) => void; onRemove: (id: string) => void }) {
+  return (
+    <div className={`rounded-lg border p-3 ${p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {(p.author_name || p.author_headline) && (
+            <p className="text-xs font-medium text-ecco-primary truncate">
+              {p.author_name}{p.author_headline ? ` · ${p.author_headline}` : ""}
+            </p>
+          )}
+          <p className="mt-1 text-sm text-ecco-secondary whitespace-pre-wrap line-clamp-4">{p.content}</p>
+          <div className="mt-2 flex items-center gap-3 text-[11px] text-ecco-tertiary">
+            <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{p.likes}</span>
+            <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{p.comments}</span>
+            <span className="flex items-center gap-1"><Repeat2 className="h-3 w-3" />{p.reposts}</span>
+            {p.vertical && <span className="rounded bg-ecco-off-white px-1.5 py-0.5">{p.vertical}</span>}
+            {p.post_url && (
+              <a href={p.post_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-ecco-accent hover:underline">
+                <ExternalLink className="h-3 w-3" /> Original
+              </a>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button size="sm" variant={p.featured ? "default" : "outline"} className={p.featured ? "bg-ecco-accent text-white" : ""} onClick={() => onToggle(p)}>
+            <Star className={`mr-1 h-3.5 w-3.5 ${p.featured ? "fill-white" : ""}`} />
+            {p.featured ? "Shared" : "Share"}
+          </Button>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-ecco-error" onClick={() => onRemove(p.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

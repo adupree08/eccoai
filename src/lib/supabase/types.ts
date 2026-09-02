@@ -366,6 +366,29 @@ export interface Database {
           featured?: boolean; featured_at?: string | null;
         };
       };
+      icp_prospects: {
+        Row: {
+          id: string; source: string; external_id: string | null;
+          full_name: string | null; headline: string | null; profile_url: string | null;
+          location: string | null; current_title: string | null; current_company: string | null;
+          email: string | null; icp_label: string | null; status: string;
+          notes: string | null; raw: unknown | null; created_at: string;
+        };
+        Insert: {
+          id?: string; source?: string; external_id?: string | null;
+          full_name?: string | null; headline?: string | null; profile_url?: string | null;
+          location?: string | null; current_title?: string | null; current_company?: string | null;
+          email?: string | null; icp_label?: string | null; status?: string;
+          notes?: string | null; raw?: unknown | null; created_at?: string;
+        };
+        Update: {
+          id?: string; source?: string; external_id?: string | null;
+          full_name?: string | null; headline?: string | null; profile_url?: string | null;
+          location?: string | null; current_title?: string | null; current_company?: string | null;
+          email?: string | null; icp_label?: string | null; status?: string;
+          notes?: string | null; raw?: unknown | null; created_at?: string;
+        };
+      };
       post_structures: {
         Row: {
           id: string; name: string; description: string;
