@@ -542,7 +542,7 @@ function CreatePostContent() {
           <div className="space-y-6">
             {/* Post options — sit above the idea box */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+              <div>
                 <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Template</label>
                 {selectedTemplate ? (
                   <div className="flex items-center justify-between gap-2 rounded-lg border border-ecco-accent bg-ecco-blue-pale px-3 py-2">
@@ -580,7 +580,7 @@ function CreatePostContent() {
                 </select>
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Content Pillar</label>
                 <select value={selectedPillar} onChange={(e) => setSelectedPillar(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
                   <option value="none">None</option>
@@ -625,7 +625,7 @@ function CreatePostContent() {
                       placeholder="Share your thoughts, insights, or experiences you want to turn into a post..."
                       value={ideaInput}
                       onChange={(e) => setIdeaInput(e.target.value)}
-                      className="min-h-[120px] resize-none"
+                      className="min-h-[60px] resize-none"
                     />
                   </div>
 
