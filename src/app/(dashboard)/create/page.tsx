@@ -537,7 +537,7 @@ function CreatePostContent() {
         </div>
 
         {/* Content Layout */}
-        <div className="max-w-3xl mx-auto">
+        <div className="w-full">
           {/* Main Input Section */}
           <div className="space-y-6">
             <TabsContent value="idea" className="m-0">
