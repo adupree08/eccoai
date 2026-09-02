@@ -17,6 +17,7 @@ import {
   Settings,
   LogOut,
   Shield,
+  TrendingUp,
 } from "lucide-react";
 
 // Admin email whitelist
@@ -47,6 +48,11 @@ const navItems = [
     name: "Library",
     href: "/library",
     icon: Library,
+  },
+  {
+    name: "Popular Posts",
+    href: "/popular",
+    icon: TrendingUp,
   },
   {
     name: "Calendar",

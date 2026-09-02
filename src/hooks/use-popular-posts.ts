@@ -16,6 +16,8 @@ export function usePopularPosts(limit = 6) {
     const { data, error } = await supabase
       .from("popular_posts")
       .select("*")
+      .eq("featured", true)
+      .order("featured_at", { ascending: false })
       .order("likes", { ascending: false })
       .limit(limit);
     if (error) setError(error.message);
