@@ -38,6 +38,12 @@ function firstNum(item: ApifyItem, keys: string[]): number {
 function asObject(v: unknown): ApifyItem {
   return v && typeof v === "object" ? (v as ApifyItem) : {};
 }
+// Only keep a value Postgres can store as timestamptz; otherwise null.
+function safeDate(v: string | null): string | null {
+  if (!v) return null;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
 
 // today -> last 24h, week -> last 7 days, all -> no date restriction
 function rangeToPostedLimit(range: string): string | null {
@@ -146,18 +152,34 @@ export async function POST(request: Request) {
           firstNum(it, ["reposts", "shares", "numShares", "repostsCount", "repostCount"]) ||
           firstNum(engagement, ["shares", "reposts", "repostsCount"]) ||
           firstNum(socialCounts, ["numShares"]),
-        posted_at: firstString(it, ["postedAt", "publishedAt", "createdAt", "date", "time"]),
+        posted_at: safeDate(firstString(it, ["postedAt", "publishedAt", "createdAt", "date", "time"])),
       };
     })
-    .filter(Boolean);
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  // Postgres rejects an upsert that touches the same (source, external_id) key
+  // twice in one batch, so de-dupe within the batch first. Rows without an
+  // external_id can't collide on the partial unique index, so keep them all.
+  const seen = new Set<string>();
+  const deduped = rows.filter((r) => {
+    if (!r.external_id) return true;
+    const key = `${r.source}:${r.external_id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   const { error: insErr } = await supabase
     .from("popular_posts")
-    .upsert(rows, { onConflict: "source,external_id", ignoreDuplicates: false });
+    .upsert(deduped, { onConflict: "source,external_id", ignoreDuplicates: false });
 
   if (insErr) {
-    return NextResponse.json({ error: "Could not save research results." }, { status: 500 });
+    console.error("popular_posts upsert failed:", insErr);
+    return NextResponse.json(
+      { error: `Could not save research results: ${insErr.message}` },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.json({ success: true, inserted: rows.length });
+  return NextResponse.json({ success: true, inserted: deduped.length });
 }

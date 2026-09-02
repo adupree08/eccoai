@@ -138,15 +138,30 @@ export async function POST(request: Request) {
         raw: it,
       };
     })
-    .filter(Boolean);
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  // De-dupe within the batch: Postgres rejects an upsert touching the same
+  // (source, external_id) twice. Rows without an external_id can't collide.
+  const seen = new Set<string>();
+  const deduped = rows.filter((r) => {
+    if (!r.external_id) return true;
+    const key = `${r.source}:${r.external_id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   const { error: insErr } = await supabase
     .from("icp_prospects")
-    .upsert(rows, { onConflict: "source,external_id", ignoreDuplicates: false });
+    .upsert(deduped, { onConflict: "source,external_id", ignoreDuplicates: false });
 
   if (insErr) {
-    return NextResponse.json({ error: "Could not save ICP prospects." }, { status: 500 });
+    console.error("icp_prospects upsert failed:", insErr);
+    return NextResponse.json(
+      { error: `Could not save ICP prospects: ${insErr.message}` },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.json({ success: true, inserted: rows.length });
+  return NextResponse.json({ success: true, inserted: deduped.length });
 }
