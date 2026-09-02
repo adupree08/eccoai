@@ -540,6 +540,80 @@ function CreatePostContent() {
         <div className="w-full">
           {/* Main Input Section */}
           <div className="space-y-6">
+            {/* Post options — sit above the idea box */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Template</label>
+                {selectedTemplate ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-ecco-accent bg-ecco-blue-pale px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-ecco-primary truncate">
+                      <LayoutTemplate className="h-3.5 w-3.5 text-ecco-accent shrink-0" />{selectedTemplate.name}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <select value={similarity} onChange={(e) => setSimilarity(e.target.value as "close" | "balanced" | "loose")} className="rounded-md border border-ecco bg-white px-2 py-1 text-xs text-ecco-primary">
+                        <option value="close">Close</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="loose">Loose</option>
+                      </select>
+                      <button onClick={() => setTemplatePickerOpen(true)} className="text-xs font-medium text-ecco-accent hover:underline">Change</button>
+                      <button onClick={() => setSelectedTemplate(null)} aria-label="Remove template" className="text-ecco-muted hover:text-ecco-error"><X className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setTemplatePickerOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-ecco bg-ecco-off-white px-3 py-2 text-sm text-ecco-tertiary hover:border-ecco-navy hover:text-ecco-primary">
+                    <LayoutTemplate className="h-4 w-4" /> Browse 50+ templates
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Tone</label>
+                <select value={selectedTones[0] ?? "None"} onChange={(e) => setSelectedTones(e.target.value === "None" ? [] : [e.target.value])} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
+                  {tones.map((t) => (<option key={t} value={t}>{t}</option>))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Length</label>
+                <select value={selectedLength} onChange={(e) => setSelectedLength(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
+                  {lengths.map((l) => (<option key={l.label} value={l.label}>{l.label}</option>))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Content Pillar</label>
+                <select value={selectedPillar} onChange={(e) => setSelectedPillar(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
+                  <option value="none">None</option>
+                  {pillars.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                </select>
+              </div>
+            </div>
+
+            {viralMode && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-ecco-secondary mb-2">Optimize for</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {engagementGoals.map((goal) => {
+                      const Icon = goal.icon;
+                      const isSelected = selectedEngagementGoal === goal.value;
+                      return (
+                        <button key={goal.value} onClick={() => setSelectedEngagementGoal(goal.value)} className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors", isSelected ? "bg-white border-amber-500 text-amber-700" : "bg-white border-gray-200 text-ecco-tertiary hover:border-amber-300")}>
+                          <Icon className={cn("h-3.5 w-3.5", isSelected ? "text-amber-500" : "")} /><span className="text-xs font-medium">{goal.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-ecco-secondary mb-2">Viral Angle</p>
+                  <select value={selectedViralAngle} onChange={(e) => setSelectedViralAngle(e.target.value)} className="w-full px-3 py-2 text-xs border border-amber-200 rounded-lg bg-white text-ecco-primary">
+                    {viralAngles.map((angle) => (<option key={angle.value} value={angle.value}>{angle.label}</option>))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             <TabsContent value="idea" className="m-0">
               <Card className="border-ecco">
                 <CardContent className="p-6 space-y-4">
@@ -786,85 +860,11 @@ function CreatePostContent() {
               )}
             </TabsContent>
 
-            {/* Media + Options + Generate */}
+            {/* Media + Generate */}
             <div className="space-y-5 mt-6">
-              <div>
-                <p className="text-sm font-semibold text-ecco-blue mb-2">Media</p>
+              <div className="max-w-sm">
                 <PostImagePicker value={postImage} onChange={setPostImage} />
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Template</label>
-                  {selectedTemplate ? (
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-ecco-accent bg-ecco-blue-pale px-3 py-2">
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-ecco-primary truncate">
-                        <LayoutTemplate className="h-3.5 w-3.5 text-ecco-accent shrink-0" />{selectedTemplate.name}
-                      </span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <select value={similarity} onChange={(e) => setSimilarity(e.target.value as "close" | "balanced" | "loose")} className="rounded-md border border-ecco bg-white px-2 py-1 text-xs text-ecco-primary">
-                          <option value="close">Close</option>
-                          <option value="balanced">Balanced</option>
-                          <option value="loose">Loose</option>
-                        </select>
-                        <button onClick={() => setTemplatePickerOpen(true)} className="text-xs font-medium text-ecco-accent hover:underline">Change</button>
-                        <button onClick={() => setSelectedTemplate(null)} aria-label="Remove template" className="text-ecco-muted hover:text-ecco-error"><X className="h-4 w-4" /></button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => setTemplatePickerOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-ecco bg-ecco-off-white px-3 py-2 text-sm text-ecco-tertiary hover:border-ecco-navy hover:text-ecco-primary">
-                      <LayoutTemplate className="h-4 w-4" /> Browse 50+ templates
-                    </button>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Tone</label>
-                  <select value={selectedTones[0] ?? "None"} onChange={(e) => setSelectedTones(e.target.value === "None" ? [] : [e.target.value])} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
-                    {tones.map((t) => (<option key={t} value={t}>{t}</option>))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Length</label>
-                  <select value={selectedLength} onChange={(e) => setSelectedLength(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
-                    {lengths.map((l) => (<option key={l.label} value={l.label}>{l.label}</option>))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-medium text-ecco-secondary mb-1.5 block">Content Pillar</label>
-                  <select value={selectedPillar} onChange={(e) => setSelectedPillar(e.target.value)} className="w-full px-3 py-2 text-sm border border-ecco rounded-lg bg-white text-ecco-primary">
-                    <option value="none">None</option>
-                    {pillars.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                  </select>
-                </div>
-              </div>
-
-              {viralMode && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
-                  <div>
-                    <p className="text-xs font-medium text-ecco-secondary mb-2">Optimize for</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {engagementGoals.map((goal) => {
-                        const Icon = goal.icon;
-                        const isSelected = selectedEngagementGoal === goal.value;
-                        return (
-                          <button key={goal.value} onClick={() => setSelectedEngagementGoal(goal.value)} className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors", isSelected ? "bg-white border-amber-500 text-amber-700" : "bg-white border-gray-200 text-ecco-tertiary hover:border-amber-300")}>
-                            <Icon className={cn("h-3.5 w-3.5", isSelected ? "text-amber-500" : "")} /><span className="text-xs font-medium">{goal.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-ecco-secondary mb-2">Viral Angle</p>
-                    <select value={selectedViralAngle} onChange={(e) => setSelectedViralAngle(e.target.value)} className="w-full px-3 py-2 text-xs border border-amber-200 rounded-lg bg-white text-ecco-primary">
-                      {viralAngles.map((angle) => (<option key={angle.value} value={angle.value}>{angle.label}</option>))}
-                    </select>
-                  </div>
-                </div>
-              )}
 
               <div className="flex items-center justify-between pt-1">
                 <p className="text-xs text-ecco-tertiary">{activeTab === "comment" ? "Generate 2 comment variations" : "Generate 2 post variations"}</p>

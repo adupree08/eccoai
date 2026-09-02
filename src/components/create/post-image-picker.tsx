@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Sparkles, Loader2, X, ImageIcon } from "lucide-react";
+import { Upload, Sparkles, Loader2, X, ImageIcon, FolderOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -20,6 +20,35 @@ export function PostImagePicker({
   const [busy, setBusy] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [showPrompt, setShowPrompt] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [library, setLibrary] = useState<string[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+
+  const openLibrary = async () => {
+    if (showLibrary) {
+      setShowLibrary(false);
+      return;
+    }
+    setShowLibrary(true);
+    setLoadingLibrary(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoadingLibrary(false);
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("post-images")
+      .list(user.id, { limit: 100, sortBy: { column: "created_at", order: "desc" } });
+    if (error || !data) {
+      setLoadingLibrary(false);
+      return;
+    }
+    const urls = data
+      .filter((f: { name: string }) => /\.(png|jpe?g|webp|gif)$/i.test(f.name))
+      .map((f: { name: string }) => supabase.storage.from("post-images").getPublicUrl(`${user.id}/${f.name}`).data.publicUrl);
+    setLibrary(urls);
+    setLoadingLibrary(false);
+  };
 
   const uploadBlob = async (blob: Blob, ext: string): Promise<string | null> => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -128,7 +157,42 @@ export function PostImagePicker({
               <Sparkles className="mr-2 h-4 w-4" />
               Generate with AI
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={openLibrary}
+              disabled={busy}
+            >
+              <FolderOpen className="mr-2 h-4 w-4" />
+              Choose from your media
+            </Button>
           </div>
+
+          {showLibrary && (
+            <div className="mt-3">
+              {loadingLibrary ? (
+                <div className="flex items-center justify-center py-4 text-ecco-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : library.length === 0 ? (
+                <p className="py-3 text-center text-xs text-ecco-muted">No images in your account yet.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto">
+                  {library.map((url) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => { onChange(url); setShowLibrary(false); }}
+                      className="relative aspect-square overflow-hidden rounded-md border border-ecco hover:border-ecco-navy focus:outline-none focus:ring-2 focus:ring-ecco-navy"
+                    >
+                      <Image src={url} alt="" fill sizes="120px" className="object-cover" unoptimized />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {showPrompt && (
             <div className="mt-3 space-y-2">

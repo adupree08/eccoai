@@ -177,7 +177,7 @@ export default function DashboardPage() {
 
       {/* Voice Setup Banner (show when no custom voice set up) */}
       {!hasCustomVoice && (
-        <div className="rounded-xl bg-gradient-to-r from-ecco-navy to-ecco-blue p-6">
+        <div className="rounded-xl bg-ecco-navy p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
@@ -225,7 +225,7 @@ export default function DashboardPage() {
           <Link key={action.title} href={action.href}>
             <Card className="h-full cursor-pointer border-ecco transition-all hover:-translate-y-0.5 hover:border-ecco-accent hover:shadow-md">
               <CardContent className="flex flex-col items-center p-6 text-center">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ecco-accent-light">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center">
                   <action.icon className="h-6 w-6 text-ecco-accent" strokeWidth={1.75} />
                 </div>
                 <h3 className="text-sm font-semibold text-ecco-primary">
