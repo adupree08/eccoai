@@ -103,9 +103,9 @@ export default function PopularPostsPage() {
                     )}
                   </div>
                 </div>
-                {p.vertical && (
+                {(p.archetype || p.vertical) && (
                   <span className="shrink-0 rounded-full border border-ecco px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ecco-tertiary">
-                    {p.vertical}
+                    {p.archetype || p.vertical}
                   </span>
                 )}
               </div>

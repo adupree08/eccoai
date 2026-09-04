@@ -347,7 +347,7 @@ export interface Database {
           content: string; vertical: string | null; keywords: string[];
           likes: number; comments: number; reposts: number;
           posted_at: string | null; created_at: string;
-          featured: boolean; featured_at: string | null;
+          featured: boolean; featured_at: string | null; archetype: string | null;
         };
         Insert: {
           id?: string; source?: string; external_id?: string | null;
@@ -355,7 +355,7 @@ export interface Database {
           content: string; vertical?: string | null; keywords?: string[];
           likes?: number; comments?: number; reposts?: number;
           posted_at?: string | null; created_at?: string;
-          featured?: boolean; featured_at?: string | null;
+          featured?: boolean; featured_at?: string | null; archetype?: string | null;
         };
         Update: {
           id?: string; source?: string; external_id?: string | null;
@@ -363,7 +363,7 @@ export interface Database {
           content?: string; vertical?: string | null; keywords?: string[];
           likes?: number; comments?: number; reposts?: number;
           posted_at?: string | null; created_at?: string;
-          featured?: boolean; featured_at?: string | null;
+          featured?: boolean; featured_at?: string | null; archetype?: string | null;
         };
       };
       icp_prospects: {

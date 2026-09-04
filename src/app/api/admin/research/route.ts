@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/auth/admin";
+import { classifyArchetypes } from "@/lib/ai/classify";
 
 // Admin-only. Runs the HarvestAPI "LinkedIn Post Search" Apify actor to pull
 // popular posts by keyword + recency, and stores them in popular_posts as a
@@ -167,6 +168,12 @@ export async function POST(request: Request) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
+  });
+
+  // Auto-tag each post with an archetype (best-effort; nulls if it fails).
+  const labels = await classifyArchetypes(deduped.map((r) => r.content));
+  deduped.forEach((r, i) => {
+    (r as { archetype?: string | null }).archetype = labels[i] ?? null;
   });
 
   const { error: insErr } = await supabase

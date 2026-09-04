@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, Sparkles, Loader2, Check, Trash2, X, Star, Heart, MessageCircle, Repeat2, TrendingUp, Users, ExternalLink, Copy } from "lucide-react";
+import { Search, Sparkles, Loader2, Check, Trash2, X, Star, Heart, MessageCircle, Repeat2, TrendingUp, Users, ExternalLink, Copy, Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/lib/supabase/types";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ export function AdminResearchPanel() {
   const [sortBy, setSortBy] = useState("relevance");
   const [searching, setSearching] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [tagging, setTagging] = useState(false);
   const [structures, setStructures] = useState<Structure[]>([]);
   const [pool, setPool] = useState<PopularPost[]>([]);
 
@@ -141,6 +142,23 @@ export function AdminResearchPanel() {
     else setPool((prev) => prev.filter((x) => x.id !== id));
   };
 
+  const tagPosts = async () => {
+    setTagging(true);
+    try {
+      const res = await fetch("/api/admin/tag-posts", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) toast.error(data.error || "Tagging failed");
+      else {
+        toast.success(data.tagged > 0 ? `Tagged ${data.tagged} posts` : (data.note || "All posts already tagged"));
+        loadPool();
+      }
+    } catch {
+      toast.error("Tagging request failed");
+    } finally {
+      setTagging(false);
+    }
+  };
+
   const runIcp = async () => {
     if (!icpQuery.trim() && !icpTitles.trim()) {
       toast.error("Enter a search query or job title");
@@ -236,9 +254,17 @@ export function AdminResearchPanel() {
 
             {/* Research pool */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-ecco-primary">Research pool {pool.length > 0 && `(${featured.length} shared)`}</p>
-                <p className="text-xs text-ecco-muted">Star a post to publish it to the users&apos; Popular Posts page</p>
+                <div className="flex items-center gap-2">
+                  <p className="hidden text-xs text-ecco-muted sm:block">Star a post to publish it to users</p>
+                  {pool.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={tagPosts} disabled={tagging}>
+                      {tagging ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tag className="mr-1.5 h-3.5 w-3.5" />}
+                      Tag posts
+                    </Button>
+                  )}
+                </div>
               </div>
               {pool.length === 0 && <p className="text-sm text-ecco-muted">Nothing yet. Run a search to pull posts.</p>}
               <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
@@ -365,30 +391,36 @@ export function AdminResearchPanel() {
   );
 }
 
+function compact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return `${n}`;
+}
+function initials(name: string | null): string {
+  if (!name) return "IN";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "IN";
+}
+
 function PoolRow({ p, onToggle, onRemove }: { p: PopularPost; onToggle: (p: PopularPost) => void; onRemove: (id: string) => void }) {
+  const pill = p.archetype || p.vertical;
   return (
-    <div className={`rounded-lg border p-3 ${p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          {(p.author_name || p.author_headline) && (
-            <p className="text-xs font-medium text-ecco-primary truncate">
-              {p.author_name}{p.author_headline ? ` · ${p.author_headline}` : ""}
-            </p>
-          )}
-          <p className="mt-1 text-sm text-ecco-secondary whitespace-pre-wrap line-clamp-4">{p.content}</p>
-          <div className="mt-2 flex items-center gap-3 text-[11px] text-ecco-tertiary">
-            <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{p.likes}</span>
-            <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{p.comments}</span>
-            <span className="flex items-center gap-1"><Repeat2 className="h-3 w-3" />{p.reposts}</span>
-            {p.vertical && <span className="rounded bg-ecco-off-white px-1.5 py-0.5">{p.vertical}</span>}
-            {p.post_url && (
-              <a href={p.post_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-ecco-accent hover:underline">
-                <ExternalLink className="h-3 w-3" /> Original
-              </a>
-            )}
+    <div className={`rounded-xl border bg-white p-4 ${p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
+      {/* Header */}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ecco-navy to-ecco-blue text-[11px] font-semibold text-white">
+            {initials(p.author_name)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-tight text-ecco-primary truncate">{p.author_name || "LinkedIn author"}</p>
+            {p.author_headline && <p className="text-[11px] leading-snug text-ecco-tertiary line-clamp-1">{p.author_headline}</p>}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {pill && (
+            <span className="mr-1 rounded-full border border-ecco px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.12em] text-ecco-tertiary">{pill}</span>
+          )}
           <Button size="sm" variant={p.featured ? "default" : "outline"} className={p.featured ? "bg-ecco-accent text-white" : ""} onClick={() => onToggle(p)}>
             <Star className={`mr-1 h-3.5 w-3.5 ${p.featured ? "fill-white" : ""}`} />
             {p.featured ? "Shared" : "Share"}
@@ -397,6 +429,21 @@ function PoolRow({ p, onToggle, onRemove }: { p: PopularPost; onToggle: (p: Popu
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      {/* Body */}
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ecco-secondary line-clamp-6">{p.content}</p>
+
+      {/* Footer */}
+      <div className="mt-3 flex items-center gap-3 border-t border-ecco-light pt-2.5 font-mono text-[11px] text-ecco-tertiary">
+        <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{compact(p.likes)}</span>
+        <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{compact(p.comments)}</span>
+        <span className="flex items-center gap-1"><Repeat2 className="h-3 w-3" />{compact(p.reposts)}</span>
+        {p.post_url && (
+          <a href={p.post_url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-ecco-accent hover:underline">
+            <ExternalLink className="h-3 w-3" /> Original
+          </a>
+        )}
       </div>
     </div>
   );
