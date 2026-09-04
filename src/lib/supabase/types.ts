@@ -343,7 +343,7 @@ export interface Database {
       popular_posts: {
         Row: {
           id: string; source: string; external_id: string | null;
-          author_name: string | null; author_headline: string | null; post_url: string | null;
+          author_name: string | null; author_headline: string | null; author_avatar: string | null; post_url: string | null;
           content: string; vertical: string | null; keywords: string[];
           likes: number; comments: number; reposts: number;
           posted_at: string | null; created_at: string;
@@ -351,7 +351,7 @@ export interface Database {
         };
         Insert: {
           id?: string; source?: string; external_id?: string | null;
-          author_name?: string | null; author_headline?: string | null; post_url?: string | null;
+          author_name?: string | null; author_headline?: string | null; author_avatar?: string | null; post_url?: string | null;
           content: string; vertical?: string | null; keywords?: string[];
           likes?: number; comments?: number; reposts?: number;
           posted_at?: string | null; created_at?: string;
@@ -359,7 +359,7 @@ export interface Database {
         };
         Update: {
           id?: string; source?: string; external_id?: string | null;
-          author_name?: string | null; author_headline?: string | null; post_url?: string | null;
+          author_name?: string | null; author_headline?: string | null; author_avatar?: string | null; post_url?: string | null;
           content?: string; vertical?: string | null; keywords?: string[];
           likes?: number; comments?: number; reposts?: number;
           posted_at?: string | null; created_at?: string;

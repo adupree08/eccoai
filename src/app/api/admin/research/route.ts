@@ -137,6 +137,9 @@ export async function POST(request: Request) {
         author_headline:
           firstString(it, ["authorHeadline", "headline", "occupation"]) ||
           firstString(author, ["headline", "occupation", "position", "info"]),
+        author_avatar:
+          firstString(it, ["authorAvatar", "authorImage", "authorProfilePicture", "profilePicture", "picture"]) ||
+          firstString(author, ["picture", "avatar", "profilePicture", "image", "photo", "profilePictureUrl"]),
         post_url: firstString(it, ["linkedinUrl", "url", "postUrl", "link"]),
         content,
         vertical: vertical || null,

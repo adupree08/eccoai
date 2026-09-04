@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AdminResearchPanel } from "@/components/admin/research-panel";
+import { StructuresPanel } from "@/components/admin/structures-panel";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "@/lib/utils";
 
 // Admin email whitelist
@@ -320,9 +322,30 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Vertical Research */}
-      <AdminResearchPanel />
+      {/* Admin sections */}
+      <Tabs defaultValue="research">
+        <TabsList className="bg-ecco-off-white">
+          <TabsTrigger value="research" className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-4 py-2">Research &amp; Growth</TabsTrigger>
+          <TabsTrigger value="structures" className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-4 py-2">Writing Structures</TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-4 py-2">User Management</TabsTrigger>
+        </TabsList>
 
+        <TabsContent value="research" className="mt-5 m-0">
+          <AdminResearchPanel />
+        </TabsContent>
+
+        <TabsContent value="structures" className="mt-5 m-0">
+          <Card className="border-ecco">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold text-ecco-primary">Writing Structures</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StructuresPanel />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-5 m-0">
       {/* User Management */}
       <Card className="border-ecco">
         <CardHeader>
@@ -431,6 +454,8 @@ export default function AdminPage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
