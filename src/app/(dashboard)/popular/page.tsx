@@ -2,10 +2,46 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { usePopularPosts } from "@/hooks/use-popular-posts";
-import { Heart, MessageCircle, Repeat2, ExternalLink, Copy, Check, TrendingUp, Loader2 } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+// 1200 -> "1.2k", 84 -> "84", 1_400_000 -> "1.4M"
+function compact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return `${n}`;
+}
+
+// "3 mo ago" style
+function relTime(iso: string | null): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(1, Math.floor((Date.now() - t) / 1000));
+  const units: [number, string][] = [
+    [60, "s"],
+    [60, "m"],
+    [24, "h"],
+    [30, "d"],
+    [12, "mo"],
+    [Number.POSITIVE_INFINITY, "y"],
+  ];
+  let value = s;
+  let label = "s";
+  for (const [step, l] of units) {
+    if (value < step) { label = l; break; }
+    value = Math.floor(value / step);
+    label = l;
+  }
+  return `${value} ${label} ago`;
+}
+
+function initials(name: string | null): string {
+  if (!name) return "IN";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "IN";
+}
 
 export default function PopularPostsPage() {
   const { popular, loading } = usePopularPosts(60);
@@ -44,41 +80,73 @@ export default function PopularPostsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mx-auto flex max-w-2xl flex-col gap-5">
           {popular.map((p) => (
-            <Card key={p.id} className="flex flex-col border-ecco">
-              <CardContent className="flex flex-1 flex-col p-5">
-                {(p.author_name || p.author_headline) && (
-                  <div className="mb-3">
-                    {p.author_name && <p className="text-sm font-semibold text-ecco-primary">{p.author_name}</p>}
-                    {p.author_headline && <p className="text-xs text-ecco-tertiary line-clamp-1">{p.author_headline}</p>}
+            <article
+              key={p.id}
+              className="group relative rounded-2xl border border-ecco bg-white p-6 shadow-sm transition-shadow hover:shadow-md sm:p-7"
+            >
+              {/* Header */}
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ecco-navy to-ecco-blue text-sm font-semibold text-white">
+                    {initials(p.author_name)}
                   </div>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold leading-tight text-ecco-primary">
+                      {p.author_name || "LinkedIn author"}
+                    </p>
+                    {p.author_headline && (
+                      <p className="mt-0.5 text-[13px] leading-snug text-ecco-tertiary line-clamp-1">
+                        {p.author_headline}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {p.vertical && (
+                  <span className="shrink-0 rounded-full border border-ecco px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ecco-tertiary">
+                    {p.vertical}
+                  </span>
                 )}
+              </div>
 
-                <p className="flex-1 whitespace-pre-wrap text-sm leading-relaxed text-ecco-secondary line-clamp-[12]">
-                  {p.content}
-                </p>
+              {/* Body */}
+              <p className="whitespace-pre-wrap text-[15px] leading-[1.7] text-ecco-secondary">
+                {p.content}
+              </p>
 
-                <div className="mt-4 flex items-center gap-4 border-t border-ecco-light pt-3 text-xs text-ecco-tertiary">
-                  <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" />{p.likes.toLocaleString()}</span>
-                  <span className="flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" />{p.comments.toLocaleString()}</span>
-                  <span className="flex items-center gap-1"><Repeat2 className="h-3.5 w-3.5" />{p.reposts.toLocaleString()}</span>
-                </div>
+              {/* Footer */}
+              <div className="mt-6 flex items-center justify-between border-t border-ecco-light pt-4 font-mono text-xs text-ecco-tertiary">
+                <span>
+                  {compact(p.likes)} · {compact(p.comments)} · {compact(p.reposts)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span>echoed{relTime(p.posted_at) ? ` · ${relTime(p.posted_at)}` : ""}</span>
+                </span>
+              </div>
 
-                <div className="mt-3 flex items-center gap-2">
-                  <Button size="sm" variant="secondary" className="flex-1" onClick={() => copy(p.id, p.content)}>
-                    {copiedId === p.id ? <><Check className="mr-1.5 h-3.5 w-3.5 text-ecco-success" />Copied</> : <><Copy className="mr-1.5 h-3.5 w-3.5" />Copy</>}
-                  </Button>
-                  {p.post_url && (
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={p.post_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+              {/* Hover actions */}
+              <div className="absolute right-4 top-4 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  onClick={() => copy(p.id, p.content)}
+                  aria-label="Copy post"
+                  className="rounded-md border border-ecco bg-white p-1.5 text-ecco-tertiary hover:text-ecco-primary"
+                >
+                  {copiedId === p.id ? <Check className="h-3.5 w-3.5 text-ecco-success" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                {p.post_url && (
+                  <a
+                    href={p.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Open original"
+                    className="rounded-md border border-ecco bg-white p-1.5 text-ecco-tertiary hover:text-ecco-primary"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            </article>
           ))}
         </div>
       )}
