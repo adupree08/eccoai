@@ -28,6 +28,7 @@ import { useUser } from "@/hooks/use-user";
 import { useBrandVoices } from "@/hooks/use-brand-voices";
 import { ContentPillarsManager } from "@/components/settings/content-pillars-manager";
 import { TimezoneSelect } from "@/components/settings/timezone-select";
+import { LinkedInConnect } from "@/components/settings/linkedin-connect";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
@@ -904,16 +905,11 @@ export default function SettingsPage() {
                 LinkedIn Connection
               </CardTitle>
               <p className="text-sm text-ecco-tertiary">
-                Connect your LinkedIn account for direct posting (coming soon)
+                Connect your LinkedIn account so eccoai can auto-post your scheduled content.
               </p>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" disabled>
-                Connect LinkedIn
-              </Button>
-              <p className="text-xs text-ecco-muted mt-2">
-                This feature is coming soon
-              </p>
+              <LinkedInConnect />
             </CardContent>
           </Card>
         </TabsContent>

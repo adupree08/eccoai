@@ -346,6 +346,8 @@ export interface Database {
           scheduled_at: string | null;
           published_at: string | null;
           linkedin_post_id: string | null;
+          publish_error: string | null;
+          publish_attempts: number;
           impressions: number;
           likes: number;
           comments: number;
@@ -370,6 +372,8 @@ export interface Database {
           scheduled_at?: string | null;
           published_at?: string | null;
           linkedin_post_id?: string | null;
+          publish_error?: string | null;
+          publish_attempts?: number;
           impressions?: number;
           likes?: number;
           comments?: number;
@@ -394,11 +398,48 @@ export interface Database {
           scheduled_at?: string | null;
           published_at?: string | null;
           linkedin_post_id?: string | null;
+          publish_error?: string | null;
+          publish_attempts?: number;
           impressions?: number;
           likes?: number;
           comments?: number;
           reposts?: number;
           created_at?: string;
+          updated_at?: string;
+        };
+      };
+      linkedin_connections: {
+        Row: {
+          user_id: string;
+          access_token: string;
+          refresh_token: string | null;
+          expires_at: string | null;
+          member_urn: string;
+          member_name: string | null;
+          scope: string | null;
+          connected_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          access_token: string;
+          refresh_token?: string | null;
+          expires_at?: string | null;
+          member_urn: string;
+          member_name?: string | null;
+          scope?: string | null;
+          connected_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          access_token?: string;
+          refresh_token?: string | null;
+          expires_at?: string | null;
+          member_urn?: string;
+          member_name?: string | null;
+          scope?: string | null;
+          connected_at?: string;
           updated_at?: string;
         };
       };
