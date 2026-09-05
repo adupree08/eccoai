@@ -291,7 +291,7 @@ export function AdminResearchPanel() {
                   Select all ({shownPool.length}{catFilter !== "all" ? ` in ${catFilter}` : ""})
                 </label>
               )}
-              <div className="columns-1 gap-3 sm:columns-2 xl:columns-3 max-h-[640px] overflow-y-auto pr-1">
+              <div className="columns-1 gap-3 sm:columns-2 xl:columns-3">
                 {shownPool.map((p) => (
                   <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
                 ))}
@@ -307,7 +307,7 @@ export function AdminResearchPanel() {
           <TabsContent value="live" className="space-y-3 m-0">
             <p className="text-sm text-ecco-tertiary">These are the posts users currently see on their Popular Posts page. Unstar to pull one back into research.</p>
             {featured.length === 0 && <p className="text-sm text-ecco-muted">Nothing published yet. Star posts in the Popular Posts tab.</p>}
-            <div className="columns-1 gap-3 sm:columns-2 xl:columns-3 max-h-[640px] overflow-y-auto pr-1">
+            <div className="columns-1 gap-3 sm:columns-2 xl:columns-3">
               {featured.map((p) => (
                 <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
               ))}
@@ -427,27 +427,39 @@ function PoolRow({ p, onToggle, onRemove, selected, onSelect }: { p: PopularPost
   const pill = p.archetype || p.vertical;
   return (
     <div className={`mb-3 flex break-inside-avoid flex-col rounded-xl border bg-white p-4 ${selected ? "border-ecco-navy ring-1 ring-ecco-navy" : p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
-      {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <input type="checkbox" checked={selected} onChange={() => onSelect(p.id)} className="h-4 w-4 shrink-0" />
-          <PoolAvatar src={p.author_avatar} name={p.author_name} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight text-ecco-primary break-words">{p.author_name || "LinkedIn author"}</p>
-            {p.author_headline && <p className="text-[11px] leading-snug text-ecco-tertiary line-clamp-1">{p.author_headline}</p>}
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {pill && (
-            <span className="mr-1 rounded-full border border-ecco px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.12em] text-ecco-tertiary">{pill}</span>
-          )}
-          <Button size="sm" variant={p.featured ? "default" : "outline"} className={p.featured ? "bg-ecco-accent text-white" : ""} onClick={() => onToggle(p)}>
-            <Star className={`mr-1 h-3.5 w-3.5 ${p.featured ? "fill-white" : ""}`} />
-            {p.featured ? "Shared" : "Share"}
-          </Button>
-          <Button size="icon" variant="ghost" className="h-8 w-8 text-ecco-error" onClick={() => onRemove(p.id)}>
+      {/* Control bar: checkbox top-left, star (share) + delete, tag far right */}
+      <div className="mb-3 flex items-center gap-2">
+        <input type="checkbox" checked={selected} onChange={() => onSelect(p.id)} className="h-4 w-4 shrink-0" />
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onToggle(p)}
+            title={p.featured ? "Shared to users — click to unshare" : "Share to users"}
+            aria-label={p.featured ? "Unshare" : "Share"}
+            className={`rounded-md p-1.5 transition-colors ${p.featured ? "text-ecco-accent" : "text-ecco-tertiary hover:text-ecco-primary"}`}
+          >
+            <Star className={`h-4 w-4 ${p.featured ? "fill-ecco-accent" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemove(p.id)}
+            aria-label="Delete"
+            className="rounded-md p-1.5 text-ecco-error transition-colors hover:bg-red-50"
+          >
             <Trash2 className="h-4 w-4" />
-          </Button>
+          </button>
+          {pill && (
+            <span className="rounded-full border border-ecco px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.12em] text-ecco-tertiary">{pill}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Author (full width so the name always has room) */}
+      <div className="mb-3 flex items-center gap-2.5">
+        <PoolAvatar src={p.author_avatar} name={p.author_name} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-tight text-ecco-primary break-words">{p.author_name || "LinkedIn author"}</p>
+          {p.author_headline && <p className="text-[11px] leading-snug text-ecco-tertiary line-clamp-1">{p.author_headline}</p>}
         </div>
       </div>
 
