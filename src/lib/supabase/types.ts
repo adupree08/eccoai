@@ -220,6 +220,8 @@ export interface Database {
           author: string | null;
           published_at: string | null;
           saved_at: string;
+          pillar_id: string | null;
+          tag: string | null;
         };
         Insert: {
           id?: string;
@@ -232,6 +234,8 @@ export interface Database {
           author?: string | null;
           published_at?: string | null;
           saved_at?: string;
+          pillar_id?: string | null;
+          tag?: string | null;
         };
         Update: {
           id?: string;
@@ -244,6 +248,64 @@ export interface Database {
           author?: string | null;
           published_at?: string | null;
           saved_at?: string;
+          pillar_id?: string | null;
+          tag?: string | null;
+        };
+      };
+      ideas: {
+        Row: {
+          id: string;
+          user_id: string;
+          source: "research" | "ai" | "manual";
+          status: "suggested" | "approved";
+          title: string | null;
+          body: string | null;
+          angle: string | null;
+          pillar_id: string | null;
+          tag: string | null;
+          source_popular_post_id: string | null;
+          source_author: string | null;
+          source_avatar: string | null;
+          source_content: string | null;
+          source_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          source: "research" | "ai" | "manual";
+          status?: "suggested" | "approved";
+          title?: string | null;
+          body?: string | null;
+          angle?: string | null;
+          pillar_id?: string | null;
+          tag?: string | null;
+          source_popular_post_id?: string | null;
+          source_author?: string | null;
+          source_avatar?: string | null;
+          source_content?: string | null;
+          source_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          source?: "research" | "ai" | "manual";
+          status?: "suggested" | "approved";
+          title?: string | null;
+          body?: string | null;
+          angle?: string | null;
+          pillar_id?: string | null;
+          tag?: string | null;
+          source_popular_post_id?: string | null;
+          source_author?: string | null;
+          source_avatar?: string | null;
+          source_content?: string | null;
+          source_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
       };
       hidden_articles: {
