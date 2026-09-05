@@ -29,7 +29,7 @@ import {
   Heart,
   LayoutTemplate,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, snapToHalfHour } from "@/lib/utils";
 import { usePosts } from "@/hooks/use-posts";
 import { useBrandVoices } from "@/hooks/use-brand-voices";
 import { useContentPillars } from "@/hooks/use-content-pillars";
@@ -482,9 +482,10 @@ function CreatePostContent() {
     // In a full implementation, you'd show a date picker modal
     setSavingPostId(post.id);
     try {
-      const scheduledAt = new Date();
-      scheduledAt.setDate(scheduledAt.getDate() + 1); // Schedule for tomorrow
-      scheduledAt.setHours(9, 0, 0, 0); // 9 AM
+      const base = new Date();
+      base.setDate(base.getDate() + 1); // Schedule for tomorrow
+      base.setHours(9, 0, 0, 0); // 9 AM
+      const scheduledAt = snapToHalfHour(base); // 30-minute increments
 
       const result = await createPost({
         content: post.content,

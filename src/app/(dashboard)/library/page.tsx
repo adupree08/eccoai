@@ -27,7 +27,7 @@ import {
   GripVertical,
   AlertCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, snapToHalfHour } from "@/lib/utils";
 import { usePosts } from "@/hooks/use-posts";
 import { Database } from "@/lib/supabase/types";
 import { toast } from "sonner";
@@ -103,7 +103,7 @@ export default function LibraryPage() {
 
     const updates: Partial<Post> = { status: newStatus };
     if (newStatus === "scheduled" && !post.scheduled_at) {
-      updates.scheduled_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      updates.scheduled_at = snapToHalfHour(new Date(Date.now() + 24 * 60 * 60 * 1000)).toISOString();
     }
     if (newStatus === "published" && !post.published_at) {
       updates.published_at = new Date().toISOString();

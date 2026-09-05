@@ -27,7 +27,7 @@ import {
   CalendarDays,
   CalendarX,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, snapToHalfHour } from "@/lib/utils";
 import Link from "next/link";
 
 interface ScheduledPost {
@@ -337,13 +337,13 @@ export default function CalendarPage() {
     const originalPost = scheduledPosts.find((p) => p.id === postId);
     if (!originalPost) return;
 
-    // Create new date with the same time
+    // Create new date with the same time, snapped to a 30-minute increment
     const newDate = new Date(dropData.year, dropData.month, dropData.day);
     newDate.setHours(originalPost.date.getHours());
     newDate.setMinutes(originalPost.date.getMinutes());
 
     // Update in database
-    await updatePost(postId, { scheduled_at: newDate.toISOString() });
+    await updatePost(postId, { scheduled_at: snapToHalfHour(newDate).toISOString() });
   };
 
   const handleToggleExpand = (postId: string) => {
