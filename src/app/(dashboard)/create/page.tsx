@@ -36,6 +36,7 @@ import { useContentPillars } from "@/hooks/use-content-pillars";
 import { PostImagePicker } from "@/components/create/post-image-picker";
 import { TemplatePicker } from "@/components/create/template-picker";
 import type { Template } from "@/hooks/use-templates";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 const formats = [
@@ -151,6 +152,9 @@ function CreatePostContent() {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [ideaInput, setIdeaInput] = useState("");
+  // Set when writing "your take" on a saved/inspiration post. The original post
+  // is the reference; ideaInput becomes the user's optional angle.
+  const [inspiration, setInspiration] = useState<{ content: string; author: string | null } | null>(null);
   const [urlInput, setUrlInput] = useState(urlParam || "");
   const [urlAngle, setUrlAngle] = useState("");
   const [rssContent, setRssContent] = useState({
@@ -191,6 +195,40 @@ function CreatePostContent() {
     }
   }, [sourceParam, urlParam, contentParam, titleParam]);
 
+  // Prefill "Write my take" from a Popular Posts card (sessionStorage) or a
+  // vault idea (?ideaId). Both land on the Idea tab with the original as reference.
+  useEffect(() => {
+    const ideaId = searchParams.get("ideaId");
+    if (ideaId) {
+      (async () => {
+        const { data } = await createClient().from("ideas").select("*").eq("id", ideaId).single();
+        if (!data) return;
+        setActiveTab("idea");
+        if (data.pillar_id) setSelectedPillar(data.pillar_id);
+        if (data.source === "research" && data.source_content) {
+          setInspiration({ content: data.source_content, author: data.source_author });
+          if (data.angle) setIdeaInput(data.angle);
+        } else {
+          setIdeaInput(data.body || data.title || "");
+        }
+      })();
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem("ecco-inspiration");
+      if (raw) {
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj.content === "string") {
+          setInspiration({ content: obj.content, author: obj.author ?? null });
+          setActiveTab("idea");
+        }
+        sessionStorage.removeItem("ecco-inspiration");
+      }
+    } catch {
+      // sessionStorage unavailable (private mode) — nothing to prefill.
+    }
+  }, [searchParams]);
+
   const fetchUrlContent = async () => {
     if (!urlInput.trim()) return;
 
@@ -230,8 +268,14 @@ function CreatePostContent() {
       let userAngle = "";
 
       if (activeTab === "idea") {
-        sourceType = "idea";
-        content = ideaInput;
+        if (inspiration) {
+          sourceType = "inspiration";
+          content = inspiration.content;
+          userAngle = ideaInput;
+        } else {
+          sourceType = "idea";
+          content = ideaInput;
+        }
       } else if (activeTab === "url") {
         sourceType = "url";
         url = urlInput;
@@ -471,7 +515,7 @@ function CreatePostContent() {
   };
 
   const canGenerate = () => {
-    if (activeTab === "idea") return ideaInput.trim().length > 0;
+    if (activeTab === "idea") return inspiration !== null || ideaInput.trim().length > 0;
     if (activeTab === "url") return urlFetched !== null;
     if (activeTab === "rss") return rssContent.content.length > 0;
     if (activeTab === "comment") return commentPostText.trim().length > 0;
@@ -617,12 +661,36 @@ function CreatePostContent() {
             <TabsContent value="idea" className="m-0">
               <Card className="border-ecco">
                 <CardContent className="p-6 space-y-4">
+                  {inspiration && (
+                    <div className="rounded-lg border border-ecco-accent bg-ecco-blue-pale p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-ecco-accent">
+                          Your take on {inspiration.author ? `${inspiration.author}'s post` : "a saved post"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setInspiration(null)}
+                          className="text-xs text-ecco-tertiary hover:text-ecco-primary"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p className="max-h-32 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-ecco-secondary">
+                        {inspiration.content}
+                      </p>
+                      <p className="mt-2 text-[11px] text-ecco-muted">
+                        We&apos;ll write an original post on this theme in your voice, never a copy.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-ecco-secondary mb-2 block">
-                      What&apos;s your idea?
+                      {inspiration ? "Your angle (optional)" : "What's your idea?"}
                     </label>
                     <Textarea
-                      placeholder="Share your thoughts, insights, or experiences you want to turn into a post..."
+                      placeholder={inspiration
+                        ? "Add your own spin, experience, or the point you want to make. Leave blank to let AI take the lead."
+                        : "Share your thoughts, insights, or experiences you want to turn into a post..."}
                       value={ideaInput}
                       onChange={(e) => setIdeaInput(e.target.value)}
                       className="min-h-[60px] resize-none"

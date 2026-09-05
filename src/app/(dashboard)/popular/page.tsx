@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePopularPosts } from "@/hooks/use-popular-posts";
-import { ExternalLink, Copy, Check, TrendingUp, Loader2 } from "lucide-react";
+import { useIdeas } from "@/hooks/use-ideas";
+import { ExternalLink, Copy, Check, TrendingUp, Loader2, Bookmark, BookmarkCheck, PenLine } from "lucide-react";
 import { ExpandableText } from "@/components/ui/expandable-text";
 import { toast } from "sonner";
 
@@ -57,10 +59,35 @@ function Avatar({ src, name }: { src: string | null; name: string | null }) {
 
 export default function PopularPostsPage() {
   const { popular, loading } = usePopularPosts(200);
+  const { saveResearchPost } = useIdeas();
+  const router = useRouter();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [type, setType] = useState("all");
   const [topic, setTopic] = useState("all");
   const [sort, setSort] = useState("popular");
+
+  const saveToVault = async (p: (typeof popular)[number]) => {
+    setSavingId(p.id);
+    const { error } = await saveResearchPost(p);
+    setSavingId(null);
+    if (error) return toast.error("Could not save to vault");
+    setSavedIds((prev) => new Set(prev).add(p.id));
+    toast.success("Saved to Idea Vault");
+  };
+
+  const writeMyTake = (p: (typeof popular)[number]) => {
+    try {
+      sessionStorage.setItem(
+        "ecco-inspiration",
+        JSON.stringify({ content: p.content, author: p.author_name })
+      );
+    } catch {
+      // sessionStorage can throw in private mode; the Create page handles an empty seed.
+    }
+    router.push("/create");
+  };
 
   const copy = async (id: string, text: string) => {
     try {
@@ -175,6 +202,25 @@ export default function PopularPostsPage() {
                 <div className="mt-5 flex items-center justify-between border-t border-ecco-light pt-3.5 font-mono text-xs text-ecco-tertiary">
                   <span>{compact(p.likes)} · {compact(p.comments)} · {compact(p.reposts)}</span>
                   <span>echoed{relTime(p.posted_at) ? ` · ${relTime(p.posted_at)}` : ""}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={() => saveToVault(p)}
+                    disabled={savedIds.has(p.id) || savingId === p.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-ecco px-3 py-1.5 text-xs font-medium text-ecco-secondary transition-colors hover:bg-ecco-off-white disabled:opacity-60"
+                  >
+                    {savedIds.has(p.id) ? <BookmarkCheck className="h-3.5 w-3.5 text-ecco-accent" /> : <Bookmark className="h-3.5 w-3.5" />}
+                    {savedIds.has(p.id) ? "Saved" : "Save to Vault"}
+                  </button>
+                  <button
+                    onClick={() => writeMyTake(p)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-ecco-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-ecco-navy-light"
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    Write my take
+                  </button>
                 </div>
 
                 {/* Hover actions */}

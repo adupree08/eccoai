@@ -181,6 +181,11 @@ export async function POST(request: Request) {
       if (userAngle && userAngle.trim()) {
         sourceContext += `\n\nIMPORTANT - The user wants to incorporate this personal angle or perspective:\n"${userAngle}"\n\nMake sure to weave their perspective into the post.`;
       }
+    } else if (sourceType === "inspiration") {
+      sourceContext = `Here is a high-performing LinkedIn post to use ONLY as inspiration. Write a completely original post on the same underlying theme, in the user's own voice. Do NOT copy its wording, hook, line-by-line structure, examples, or specific details. Take the core idea and make it genuinely the user's own take.\n\n--- INSPIRATION POST ---\n${content}\n--- END OF INSPIRATION POST ---`;
+      if (userAngle && userAngle.trim()) {
+        sourceContext += `\n\nIMPORTANT - Center the post on the user's own angle or perspective:\n"${userAngle}"`;
+      }
     } else if (sourceType === "comment") {
       isComment = true;
       sourceContext = `Generate a thoughtful, engaging LinkedIn comment to respond to this post:\n\n--- ORIGINAL POST ---\n${content}\n--- END OF POST ---`;
