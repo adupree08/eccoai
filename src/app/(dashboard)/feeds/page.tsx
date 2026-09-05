@@ -231,6 +231,31 @@ export default function FeedsPage() {
     toast.success("Article deleted");
   };
 
+  // Bulk delete every article in a feed EXCEPT ones saved for later. Saved
+  // articles are skipped so their snapshot (and cascade reference) survive.
+  const bulkDeleteFeedArticles = async (feedId: string) => {
+    const articles = feedArticles[feedId] || [];
+    const toDelete = articles.filter((a) => !savedArticleIds.has(a.id)).map((a) => a.id);
+    if (toDelete.length === 0) {
+      toast.info("Nothing to delete here (saved articles are kept)");
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(`Delete ${toDelete.length} article${toDelete.length === 1 ? "" : "s"} from this feed? Saved articles are kept. This cannot be undone.`)) {
+      return;
+    }
+    const { error } = await supabase.from("articles").delete().in("id", toDelete);
+    if (error) {
+      toast.error("Could not delete the articles");
+      return;
+    }
+    setFeedArticles((prev) => ({
+      ...prev,
+      [feedId]: (prev[feedId] || []).filter((a) => savedArticleIds.has(a.id)),
+    }));
+    setArticleCounts((prev) => ({ ...prev, [feedId]: Math.max(0, (prev[feedId] || 0) - toDelete.length) }));
+    toast.success(`Deleted ${toDelete.length} article${toDelete.length === 1 ? "" : "s"}`);
+  };
+
   const toggleFeedExpand = async (feedId: string) => {
     const newExpanded = new Set(expandedFeeds);
     if (newExpanded.has(feedId)) {
@@ -803,7 +828,7 @@ export default function FeedsPage() {
                 <div className="border-t border-ecco-light px-4 pb-4">
                   <div className="grid gap-4 pt-4 sm:grid-cols-2">
                     {(feedArticles[feed.id] || [])
-                      .filter(article => !hiddenArticleIds.has(article.id))
+                      .filter(article => !hiddenArticleIds.has(article.id) && !savedArticleIds.has(article.id))
                       .map((article) => (
                       <div
                         key={article.id}
@@ -914,7 +939,7 @@ export default function FeedsPage() {
                   </div>
 
                   {feedArticles[feed.id] && feedArticles[feed.id].length > 0 && (
-                    <div className="mt-4 flex justify-center">
+                    <div className="mt-4 flex justify-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -928,6 +953,17 @@ export default function FeedsPage() {
                         )}
                         Refresh Feed
                       </Button>
+                      {(feedArticles[feed.id] || []).some((a) => !savedArticleIds.has(a.id)) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-ecco-error text-ecco-error hover:bg-red-50"
+                          onClick={() => bulkDeleteFeedArticles(feed.id)}
+                        >
+                          <Trash2 className="mr-2 h-3 w-3" />
+                          Delete all (keep saved)
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
