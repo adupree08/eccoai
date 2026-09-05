@@ -270,7 +270,7 @@ export function AdminResearchPanel() {
                   Select all ({pool.length})
                 </label>
               )}
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 max-h-[640px] overflow-y-auto pr-1">
                 {pool.map((p) => (
                   <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
                 ))}
@@ -286,7 +286,7 @@ export function AdminResearchPanel() {
           <TabsContent value="live" className="space-y-3 m-0">
             <p className="text-sm text-ecco-tertiary">These are the posts users currently see on their Popular Posts page. Unstar to pull one back into research.</p>
             {featured.length === 0 && <p className="text-sm text-ecco-muted">Nothing published yet. Star posts in the Popular Posts tab.</p>}
-            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 max-h-[640px] overflow-y-auto pr-1">
               {featured.map((p) => (
                 <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
               ))}
@@ -405,7 +405,7 @@ function PoolAvatar({ src, name }: { src: string | null; name: string | null }) 
 function PoolRow({ p, onToggle, onRemove, selected, onSelect }: { p: PopularPost; onToggle: (p: PopularPost) => void; onRemove: (id: string) => void; selected: boolean; onSelect: (id: string) => void }) {
   const pill = p.archetype || p.vertical;
   return (
-    <div className={`rounded-xl border bg-white p-4 ${selected ? "border-ecco-navy ring-1 ring-ecco-navy" : p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
+    <div className={`flex h-full flex-col rounded-xl border bg-white p-4 ${selected ? "border-ecco-navy ring-1 ring-ecco-navy" : p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -431,7 +431,7 @@ function PoolRow({ p, onToggle, onRemove, selected, onSelect }: { p: PopularPost
       </div>
 
       {/* Body */}
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ecco-secondary line-clamp-6">{p.content}</p>
+      <p className="flex-1 whitespace-pre-wrap text-sm leading-relaxed text-ecco-secondary line-clamp-6">{p.content}</p>
 
       {/* Footer */}
       <div className="mt-3 flex items-center gap-3 border-t border-ecco-light pt-2.5 font-mono text-[11px] text-ecco-tertiary">

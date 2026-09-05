@@ -124,6 +124,8 @@ export async function POST(request: Request) {
       const author = asObject(it.author);
       const engagement = asObject(it.engagement);
       const socialCounts = asObject(it.socialCounts);
+      const avatar = asObject(author.avatar); // HarvestAPI: author.avatar = { url, width, height }
+      const postedAt = asObject(it.postedAt); // HarvestAPI: postedAt = { timestamp, date, ... }
 
       const authorName =
         firstString(it, ["authorName", "author", "fullName", "name"]) ||
@@ -138,6 +140,7 @@ export async function POST(request: Request) {
           firstString(it, ["authorHeadline", "headline", "occupation"]) ||
           firstString(author, ["headline", "occupation", "position", "info"]),
         author_avatar:
+          firstString(avatar, ["url"]) ||
           firstString(it, ["authorAvatar", "authorImage", "authorProfilePicture", "profilePicture", "picture"]) ||
           firstString(author, ["picture", "avatar", "profilePicture", "image", "photo", "profilePictureUrl"]),
         post_url: firstString(it, ["linkedinUrl", "url", "postUrl", "link"]),
@@ -156,7 +159,11 @@ export async function POST(request: Request) {
           firstNum(it, ["reposts", "shares", "numShares", "repostsCount", "repostCount"]) ||
           firstNum(engagement, ["shares", "reposts", "repostsCount"]) ||
           firstNum(socialCounts, ["numShares"]),
-        posted_at: safeDate(firstString(it, ["postedAt", "publishedAt", "createdAt", "date", "time"])),
+        posted_at: safeDate(
+          firstString(postedAt, ["date"]) ||
+          (typeof postedAt.timestamp === "number" ? new Date(postedAt.timestamp).toISOString() : null) ||
+          firstString(it, ["publishedAt", "createdAt", "date", "time"])
+        ),
       };
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
