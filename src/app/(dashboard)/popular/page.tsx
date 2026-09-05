@@ -43,12 +43,12 @@ function Avatar({ src, name }: { src: string | null; name: string | null }) {
         src={src}
         alt={name || "author"}
         onError={() => setFailed(true)}
-        className="h-14 w-14 shrink-0 rounded-full object-cover"
+        className="h-12 w-12 shrink-0 rounded-full object-cover"
       />
     );
   }
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ecco-navy to-ecco-blue text-base font-semibold text-white">
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ecco-navy to-ecco-blue text-sm font-semibold text-white">
       {initials(name)}
     </div>
   );
@@ -132,49 +132,49 @@ export default function PopularPostsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {shown.map((p) => {
             const pill = p.archetype || p.vertical;
             return (
               <article
                 key={p.id}
-                className="group relative rounded-[20px] border border-ecco bg-white p-8 shadow-sm transition-shadow hover:shadow-md"
+                className="group relative flex h-full flex-col rounded-[20px] border border-ecco bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
               >
                 {/* Header */}
-                <div className="mb-6 flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3.5">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
                     <Avatar src={p.author_avatar} name={p.author_name} />
                     <div className="min-w-0">
-                      <p className="text-[19px] font-bold leading-tight text-ecco-primary">
+                      <p className="text-base font-bold leading-tight text-ecco-primary line-clamp-1">
                         {p.author_name || "LinkedIn author"}
                       </p>
                       {p.author_headline && (
-                        <p className="mt-1 text-[15px] leading-snug text-ecco-tertiary line-clamp-1">
+                        <p className="mt-0.5 text-[13px] leading-snug text-ecco-tertiary line-clamp-1">
                           {p.author_headline}
                         </p>
                       )}
                     </div>
                   </div>
                   {pill && (
-                    <span className="shrink-0 rounded-full border border-ecco px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-ecco-tertiary">
+                    <span className="shrink-0 rounded-full border border-ecco px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ecco-tertiary">
                       {pill}
                     </span>
                   )}
                 </div>
 
                 {/* Body */}
-                <p className="whitespace-pre-wrap text-[17px] leading-[1.65] text-ecco-secondary">
+                <p className="flex-1 whitespace-pre-wrap text-[15px] leading-[1.6] text-ecco-secondary line-clamp-[14]">
                   {p.content}
                 </p>
 
                 {/* Footer */}
-                <div className="mt-7 flex items-center justify-between border-t border-ecco-light pt-4 font-mono text-[13px] text-ecco-tertiary">
+                <div className="mt-5 flex items-center justify-between border-t border-ecco-light pt-3.5 font-mono text-xs text-ecco-tertiary">
                   <span>{compact(p.likes)} · {compact(p.comments)} · {compact(p.reposts)}</span>
                   <span>echoed{relTime(p.posted_at) ? ` · ${relTime(p.posted_at)}` : ""}</span>
                 </div>
 
                 {/* Hover actions */}
-                <div className="absolute right-5 top-5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="absolute right-4 top-4 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     onClick={() => copy(p.id, p.content)}
                     aria-label="Copy post"

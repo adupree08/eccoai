@@ -33,6 +33,8 @@ export function AdminResearchPanel() {
   const [searching, setSearching] = useState(false);
   const [tagging, setTagging] = useState(false);
   const [pool, setPool] = useState<PopularPost[]>([]);
+  const [selPosts, setSelPosts] = useState<Set<string>>(new Set());
+  const [selProspects, setSelProspects] = useState<Set<string>>(new Set());
 
   // ---- ICP ----
   const [icpQuery, setIcpQuery] = useState("");
@@ -173,7 +175,36 @@ export function AdminResearchPanel() {
     }
   };
 
+  const togglePost = (id: string) =>
+    setSelPosts((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleProspect = (id: string) =>
+    setSelProspects((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const bulkDeletePosts = async () => {
+    const ids = [...selPosts];
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} post${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("popular_posts").delete().in("id", ids);
+    if (error) return toast.error("Could not delete");
+    setPool((prev) => prev.filter((p) => !selPosts.has(p.id)));
+    setSelPosts(new Set());
+    toast.success(`Deleted ${ids.length} post${ids.length === 1 ? "" : "s"}`);
+  };
+
+  const bulkDeleteProspects = async () => {
+    const ids = [...selProspects];
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} prospect${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("icp_prospects").delete().in("id", ids);
+    if (error) return toast.error("Could not delete");
+    setProspects((prev) => prev.filter((p) => !selProspects.has(p.id)));
+    setSelProspects(new Set());
+    toast.success(`Deleted ${ids.length} prospect${ids.length === 1 ? "" : "s"}`);
+  };
+
   const featured = pool.filter((p) => p.featured);
+  const allPoolSelected = pool.length > 0 && pool.every((p) => selPosts.has(p.id));
+  const allProspectsSelected = prospects.length > 0 && prospects.every((p) => selProspects.has(p.id));
   const tabTrigger = "data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-4 py-2";
 
   return (
@@ -219,7 +250,11 @@ export function AdminResearchPanel() {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-ecco-primary">Research pool {pool.length > 0 && `(${featured.length} shared)`}</p>
                 <div className="flex items-center gap-2">
-                  <p className="hidden text-xs text-ecco-muted sm:block">Star a post to publish it to users</p>
+                  {selPosts.size > 0 && (
+                    <Button size="sm" variant="outline" className="border-ecco-error text-ecco-error hover:bg-red-50" onClick={bulkDeletePosts}>
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete {selPosts.size}
+                    </Button>
+                  )}
                   {pool.length > 0 && (
                     <Button size="sm" variant="outline" onClick={tagPosts} disabled={tagging}>
                       {tagging ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tag className="mr-1.5 h-3.5 w-3.5" />}
@@ -229,9 +264,15 @@ export function AdminResearchPanel() {
                 </div>
               </div>
               {pool.length === 0 && <p className="text-sm text-ecco-muted">Nothing yet. Run a search to pull posts.</p>}
+              {pool.length > 0 && (
+                <label className="flex items-center gap-2 text-xs text-ecco-tertiary">
+                  <input type="checkbox" checked={allPoolSelected} onChange={() => setSelPosts(allPoolSelected ? new Set() : new Set(pool.map((p) => p.id)))} className="h-3.5 w-3.5" />
+                  Select all ({pool.length})
+                </label>
+              )}
               <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {pool.map((p) => (
-                  <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} />
+                  <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
                 ))}
               </div>
             </div>
@@ -247,7 +288,7 @@ export function AdminResearchPanel() {
             {featured.length === 0 && <p className="text-sm text-ecco-muted">Nothing published yet. Star posts in the Popular Posts tab.</p>}
             <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
               {featured.map((p) => (
-                <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} />
+                <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
               ))}
             </div>
           </TabsContent>
@@ -273,12 +314,27 @@ export function AdminResearchPanel() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-ecco-primary">Prospects {prospects.length > 0 && `(${prospects.length})`}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-ecco-primary">Prospects {prospects.length > 0 && `(${prospects.length})`}</p>
+                {selProspects.size > 0 && (
+                  <Button size="sm" variant="outline" className="border-ecco-error text-ecco-error hover:bg-red-50" onClick={bulkDeleteProspects}>
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete {selProspects.size}
+                  </Button>
+                )}
+              </div>
               {prospects.length === 0 && <p className="text-sm text-ecco-muted">No prospects yet. Run a search to build your list.</p>}
+              {prospects.length > 0 && (
+                <label className="flex items-center gap-2 text-xs text-ecco-tertiary">
+                  <input type="checkbox" checked={allProspectsSelected} onChange={() => setSelProspects(allProspectsSelected ? new Set() : new Set(prospects.map((p) => p.id)))} className="h-3.5 w-3.5" />
+                  Select all ({prospects.length})
+                </label>
+              )}
               <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
                 {prospects.map((p) => (
-                  <div key={p.id} className="rounded-lg border border-ecco-light p-3">
+                  <div key={p.id} className={`rounded-lg border p-3 ${selProspects.has(p.id) ? "border-ecco-navy ring-1 ring-ecco-navy" : "border-ecco-light"}`}>
                     <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                      <input type="checkbox" checked={selProspects.has(p.id)} onChange={() => toggleProspect(p.id)} className="mt-0.5 h-4 w-4 shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-ecco-primary truncate">{p.full_name || "Unknown"}</p>
                         {p.headline && <p className="text-xs text-ecco-tertiary line-clamp-2">{p.headline}</p>}
@@ -297,6 +353,7 @@ export function AdminResearchPanel() {
                             </button>
                           )}
                         </div>
+                      </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <select value={p.status} onChange={(e) => setProspectStatus(p, e.target.value)} className="rounded-md border border-ecco bg-white px-2 py-1 text-xs text-ecco-primary capitalize">
@@ -345,13 +402,14 @@ function PoolAvatar({ src, name }: { src: string | null; name: string | null }) 
   );
 }
 
-function PoolRow({ p, onToggle, onRemove }: { p: PopularPost; onToggle: (p: PopularPost) => void; onRemove: (id: string) => void }) {
+function PoolRow({ p, onToggle, onRemove, selected, onSelect }: { p: PopularPost; onToggle: (p: PopularPost) => void; onRemove: (id: string) => void; selected: boolean; onSelect: (id: string) => void }) {
   const pill = p.archetype || p.vertical;
   return (
-    <div className={`rounded-xl border bg-white p-4 ${p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
+    <div className={`rounded-xl border bg-white p-4 ${selected ? "border-ecco-navy ring-1 ring-ecco-navy" : p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
+          <input type="checkbox" checked={selected} onChange={() => onSelect(p.id)} className="h-4 w-4 shrink-0" />
           <PoolAvatar src={p.author_avatar} name={p.author_name} />
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-tight text-ecco-primary truncate">{p.author_name || "LinkedIn author"}</p>
