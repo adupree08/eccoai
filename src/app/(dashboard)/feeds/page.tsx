@@ -46,19 +46,6 @@ interface Article {
   published_at: string | null;
 }
 
-interface SavedArticle {
-  id: string;
-  user_id: string;
-  article_id: string;
-  feed_id: string;
-  title: string;
-  snippet: string | null;
-  url: string;
-  author: string | null;
-  published_at: string | null;
-  saved_at: string;
-}
-
 export default function FeedsPage() {
   const router = useRouter();
   const { feeds, loading, createFeed, updateFeed, deleteFeed, toggleFeedActive, refetch } = useFeeds();
@@ -74,11 +61,9 @@ export default function FeedsPage() {
   const [editingFeedId, setEditingFeedId] = useState<string | null>(null);
   const [editingFeedName, setEditingFeedName] = useState("");
   const [articleCounts, setArticleCounts] = useState<Record<string, number>>({});
-  const [activeView, setActiveView] = useState<"feeds" | "saved">("feeds");
-  const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
   const [savedArticleIds, setSavedArticleIds] = useState<Set<string>>(new Set());
   const [hiddenArticleIds, setHiddenArticleIds] = useState<Set<string>>(new Set());
-  const [loadingSavedArticles, setLoadingSavedArticles] = useState(false);
+  const [checkedArticleIds, setCheckedArticleIds] = useState<Set<string>>(new Set());
 
   const supabase = createClient();
 
@@ -101,19 +86,13 @@ export default function FeedsPage() {
     fetchArticleCounts();
   }, [fetchArticleCounts]);
 
-  // Fetch saved articles
+  // Fetch saved article IDs (used to hide saved items from the feed list and to
+  // skip them on bulk delete). The saved articles themselves live in the Idea Vault.
   const fetchSavedArticles = useCallback(async () => {
-    setLoadingSavedArticles(true);
-    const { data } = await supabase
-      .from("saved_articles")
-      .select("*")
-      .order("saved_at", { ascending: false });
-
+    const { data } = await supabase.from("saved_articles").select("article_id");
     if (data) {
-      setSavedArticles(data as SavedArticle[]);
-      setSavedArticleIds(new Set(data.map((a: SavedArticle) => a.article_id)));
+      setSavedArticleIds(new Set(data.map((a: { article_id: string }) => a.article_id)));
     }
-    setLoadingSavedArticles(false);
   }, [supabase]);
 
   // Fetch hidden article IDs
@@ -181,7 +160,6 @@ export default function FeedsPage() {
         newSet.delete(articleId);
         return newSet;
       });
-      setSavedArticles(prev => prev.filter(a => a.article_id !== articleId));
     }
   };
 
@@ -227,33 +205,45 @@ export default function FeedsPage() {
       ...prev,
       [feedId]: (prev[feedId] || []).filter(a => a.id !== articleId),
     }));
-    setSavedArticles(prev => prev.filter(a => a.article_id !== articleId));
     toast.success("Article deleted");
   };
 
-  // Bulk delete every article in a feed EXCEPT ones saved for later. Saved
-  // articles are skipped so their snapshot (and cascade reference) survive.
-  const bulkDeleteFeedArticles = async (feedId: string) => {
+  const toggleChecked = (id: string) =>
+    setCheckedArticleIds((prev) => {
+      const s = new Set(prev);
+      s.has(id) ? s.delete(id) : s.add(id);
+      return s;
+    });
+
+  // Bulk delete the checked articles in a feed. Saved articles are skipped so
+  // their snapshot (and cascade reference) survive.
+  const deleteCheckedInFeed = async (feedId: string) => {
     const articles = feedArticles[feedId] || [];
-    const toDelete = articles.filter((a) => !savedArticleIds.has(a.id)).map((a) => a.id);
-    if (toDelete.length === 0) {
-      toast.info("Nothing to delete here (saved articles are kept)");
+    const ids = articles.filter((a) => checkedArticleIds.has(a.id) && !savedArticleIds.has(a.id)).map((a) => a.id);
+    if (ids.length === 0) {
+      toast.info("Select articles to delete first");
       return;
     }
-    if (typeof window !== "undefined" && !window.confirm(`Delete ${toDelete.length} article${toDelete.length === 1 ? "" : "s"} from this feed? Saved articles are kept. This cannot be undone.`)) {
+    if (typeof window !== "undefined" && !window.confirm(`Delete ${ids.length} selected article${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) {
       return;
     }
-    const { error } = await supabase.from("articles").delete().in("id", toDelete);
+    const { error } = await supabase.from("articles").delete().in("id", ids);
     if (error) {
       toast.error("Could not delete the articles");
       return;
     }
+    const idSet = new Set(ids);
     setFeedArticles((prev) => ({
       ...prev,
-      [feedId]: (prev[feedId] || []).filter((a) => savedArticleIds.has(a.id)),
+      [feedId]: (prev[feedId] || []).filter((a) => !idSet.has(a.id)),
     }));
-    setArticleCounts((prev) => ({ ...prev, [feedId]: Math.max(0, (prev[feedId] || 0) - toDelete.length) }));
-    toast.success(`Deleted ${toDelete.length} article${toDelete.length === 1 ? "" : "s"}`);
+    setArticleCounts((prev) => ({ ...prev, [feedId]: Math.max(0, (prev[feedId] || 0) - ids.length) }));
+    setCheckedArticleIds((prev) => {
+      const s = new Set(prev);
+      ids.forEach((id) => s.delete(id));
+      return s;
+    });
+    toast.success(`Deleted ${ids.length} article${ids.length === 1 ? "" : "s"}`);
   };
 
   const toggleFeedExpand = async (feedId: string) => {
@@ -462,137 +452,6 @@ export default function FeedsPage() {
         </Button>
       </div>
 
-      {/* View Toggle */}
-      <div className="flex gap-2 border-b border-ecco-light">
-        <button
-          onClick={() => setActiveView("feeds")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeView === "feeds"
-              ? "border-ecco-navy text-ecco-navy"
-              : "border-transparent text-ecco-tertiary hover:text-ecco-primary"
-          }`}
-        >
-          <Rss className="inline-block mr-2 h-4 w-4" />
-          My Feeds
-        </button>
-        <button
-          onClick={() => setActiveView("saved")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeView === "saved"
-              ? "border-ecco-navy text-ecco-navy"
-              : "border-transparent text-ecco-tertiary hover:text-ecco-primary"
-          }`}
-        >
-          <Bookmark className="inline-block mr-2 h-4 w-4" />
-          Saved for Later
-          {savedArticles.length > 0 && (
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {savedArticles.length}
-            </Badge>
-          )}
-        </button>
-      </div>
-
-      {/* Saved Articles View */}
-      {activeView === "saved" && (
-        <div className="space-y-4">
-          {loadingSavedArticles ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-ecco-tertiary" />
-            </div>
-          ) : savedArticles.length === 0 ? (
-            <Card className="border-ecco border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ecco-accent-light">
-                  <Bookmark className="h-6 w-6 text-ecco-accent" />
-                </div>
-                <h3 className="text-base font-semibold text-ecco-primary">
-                  No saved articles yet
-                </h3>
-                <p className="mt-1 text-sm text-ecco-tertiary text-center max-w-md">
-                  Save articles from your feeds to read or create posts from later. Click the bookmark icon on any article to save it.
-                </p>
-                <Button
-                  onClick={() => setActiveView("feeds")}
-                  className="mt-4 bg-ecco-navy hover:bg-ecco-navy-light"
-                >
-                  <Rss className="mr-2 h-4 w-4" />
-                  Browse Feeds
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {savedArticles.map((article) => (
-                <Card key={article.id} className="border-ecco">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="text-sm font-semibold text-ecco-primary line-clamp-2 flex-1">
-                        {article.title}
-                      </h4>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 shrink-0 text-ecco-muted hover:text-ecco-error"
-                        onClick={() => unsaveArticle(article.article_id)}
-                        title="Remove from saved"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {article.snippet && (
-                      <p className="text-xs text-ecco-tertiary mb-3 line-clamp-2">
-                        {article.snippet}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mb-3">
-                      {article.published_at && (
-                        <p className="text-xs text-ecco-muted">
-                          {formatLastFetched(article.published_at)}
-                        </p>
-                      )}
-                      <p className="text-xs text-ecco-muted">
-                        Saved {formatLastFetched(article.saved_at)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 text-xs"
-                        onClick={() => window.open(article.url, "_blank")}
-                      >
-                        <ExternalLink className="mr-1 h-3 w-3" />
-                        Read
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs bg-ecco-navy hover:bg-ecco-navy-light"
-                        onClick={() => {
-                          const params = new URLSearchParams({
-                            source: "rss",
-                            title: article.title,
-                            url: article.url,
-                            content: article.snippet || "",
-                          });
-                          router.push(`/create?${params.toString()}`);
-                        }}
-                      >
-                        <Sparkles className="mr-1 h-3 w-3" />
-                        Create Post
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Feeds View */}
-      {activeView === "feeds" && (
-        <>
       {/* Add Feed Form */}
       {isAddingFeed && (
         <Card className="border-ecco border-dashed">
@@ -769,6 +628,18 @@ export default function FeedsPage() {
                         >
                           <Edit2 className="h-3 w-3" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-ecco-muted hover:text-ecco-error"
+                          title="Delete feed"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFeed(feed.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </>
                     )}
                     <Badge variant="secondary" className="text-xs">
@@ -812,10 +683,12 @@ export default function FeedsPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-ecco-muted hover:text-ecco-error hover:bg-red-50"
+                    className="h-8 w-8 text-ecco-muted hover:text-ecco-error hover:bg-red-50 disabled:opacity-40 disabled:hover:text-ecco-muted disabled:hover:bg-transparent"
+                    title="Delete selected articles"
+                    disabled={!(feedArticles[feed.id] || []).some((a) => checkedArticleIds.has(a.id))}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteFeed(feed.id);
+                      deleteCheckedInFeed(feed.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -832,8 +705,16 @@ export default function FeedsPage() {
                       .map((article) => (
                       <div
                         key={article.id}
-                        className="rounded-lg border border-ecco-light p-4 relative group"
+                        className={`rounded-lg border p-4 relative group ${checkedArticleIds.has(article.id) ? "border-ecco-navy ring-1 ring-ecco-navy" : "border-ecco-light"}`}
                       >
+                        {/* Select for bulk delete */}
+                        <input
+                          type="checkbox"
+                          checked={checkedArticleIds.has(article.id)}
+                          onChange={() => toggleChecked(article.id)}
+                          className="absolute top-3 left-3 z-10 h-4 w-4"
+                          title="Select for bulk delete"
+                        />
                         {/* Save and Hide buttons */}
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <Button
@@ -882,7 +763,7 @@ export default function FeedsPage() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        <h4 className="text-sm font-semibold text-ecco-primary mb-2 line-clamp-2 pr-16">
+                        <h4 className="text-sm font-semibold text-ecco-primary mb-2 line-clamp-2 pl-7 pr-16">
                           {article.title}
                         </h4>
                         {article.snippet && (
@@ -939,7 +820,7 @@ export default function FeedsPage() {
                   </div>
 
                   {feedArticles[feed.id] && feedArticles[feed.id].length > 0 && (
-                    <div className="mt-4 flex justify-center gap-2">
+                    <div className="mt-4 flex justify-center">
                       <Button
                         variant="outline"
                         size="sm"
@@ -953,17 +834,6 @@ export default function FeedsPage() {
                         )}
                         Refresh Feed
                       </Button>
-                      {(feedArticles[feed.id] || []).some((a) => !savedArticleIds.has(a.id)) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-ecco-error text-ecco-error hover:bg-red-50"
-                          onClick={() => bulkDeleteFeedArticles(feed.id)}
-                        >
-                          <Trash2 className="mr-2 h-3 w-3" />
-                          Delete all (keep saved)
-                        </Button>
-                      )}
                     </div>
                   )}
                 </div>
@@ -995,8 +865,6 @@ export default function FeedsPage() {
             </Button>
           </CardContent>
         </Card>
-      )}
-        </>
       )}
     </div>
   );
