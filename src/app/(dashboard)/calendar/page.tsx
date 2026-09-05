@@ -26,8 +26,10 @@ import {
   Loader2,
   CalendarDays,
   CalendarX,
+  Send,
 } from "lucide-react";
 import { cn, snapToHalfHour } from "@/lib/utils";
+import { toast } from "sonner";
 import Link from "next/link";
 
 interface ScheduledPost {
@@ -46,16 +48,20 @@ function DraggablePost({
   onToggleExpand,
   onCopy,
   onUnschedule,
+  onPostNow,
   copiedId,
   unschedulingId,
+  postingId,
 }: {
   post: ScheduledPost;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onCopy: (content: string, id: string) => void;
   onUnschedule: (id: string) => void;
+  onPostNow: (id: string) => void;
   copiedId: string | null;
   unschedulingId: string | null;
+  postingId: string | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: post.id,
@@ -152,6 +158,19 @@ function DraggablePost({
               Unschedule
             </Button>
           </div>
+          <Button
+            size="sm"
+            className="mt-2 h-7 w-full bg-ecco-navy text-xs hover:bg-ecco-navy-light"
+            onClick={() => onPostNow(post.id)}
+            disabled={postingId === post.id}
+          >
+            {postingId === post.id ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Send className="mr-1 h-3 w-3" />
+            )}
+            Post now
+          </Button>
         </div>
       )}
     </div>
@@ -168,8 +187,10 @@ function DroppableDay({
   onToggleExpand,
   onCopy,
   onUnschedule,
+  onPostNow,
   copiedId,
   unschedulingId,
+  postingId,
 }: {
   date: Date;
   isCurrentMonth: boolean;
@@ -179,8 +200,10 @@ function DroppableDay({
   onToggleExpand: (postId: string) => void;
   onCopy: (content: string, id: string) => void;
   onUnschedule: (id: string) => void;
+  onPostNow: (id: string) => void;
   copiedId: string | null;
   unschedulingId: string | null;
+  postingId: string | null;
 }) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -225,8 +248,10 @@ function DroppableDay({
             onToggleExpand={() => onToggleExpand(post.id)}
             onCopy={onCopy}
             onUnschedule={onUnschedule}
+            onPostNow={onPostNow}
             copiedId={copiedId}
             unschedulingId={unschedulingId}
+            postingId={postingId}
           />
         ))}
       </div>
@@ -240,8 +265,32 @@ export default function CalendarPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [unschedulingId, setUnschedulingId] = useState<string | null>(null);
+  const [postingId, setPostingId] = useState<string | null>(null);
 
-  const { posts, loading, updatePost, unschedulePost } = usePosts();
+  const { posts, loading, updatePost, unschedulePost, refetch } = usePosts();
+
+  // Publish a scheduled post to LinkedIn immediately.
+  const handlePostNow = async (postId: string) => {
+    setPostingId(postId);
+    try {
+      const res = await fetch("/api/linkedin/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Could not post to LinkedIn");
+      } else {
+        toast.success("Posted to LinkedIn");
+        refetch();
+      }
+    } catch {
+      toast.error("Could not post to LinkedIn");
+    } finally {
+      setPostingId(null);
+    }
+  };
 
   // Convert scheduled posts from database to calendar format
   const scheduledPosts: ScheduledPost[] = useMemo(() => {
@@ -481,8 +530,10 @@ export default function CalendarPage() {
                   onToggleExpand={handleToggleExpand}
                   onCopy={handleCopy}
                   onUnschedule={handleUnschedule}
+                  onPostNow={handlePostNow}
                   copiedId={copiedId}
                   unschedulingId={unschedulingId}
+                  postingId={postingId}
                 />
               );
             })}
