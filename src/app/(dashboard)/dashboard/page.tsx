@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -354,11 +355,12 @@ export default function DashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               {popular.map((p) => (
                 <div key={p.id} className="rounded-lg border border-ecco-light p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-ecco-secondary truncate">
+                  <div className="mb-2 flex items-center gap-2.5">
+                    <MiniAvatar src={p.author_avatar} name={p.author_name} />
+                    <span className="text-xs font-medium text-ecco-secondary break-words">
                       {p.author_name || "LinkedIn creator"}
                     </span>
-                    <span className="text-[11px] text-ecco-tertiary shrink-0">
+                    <span className="ml-auto text-[11px] text-ecco-tertiary shrink-0">
                       {p.likes.toLocaleString()} likes
                     </span>
                   </div>
@@ -381,6 +383,25 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function initials(name: string | null): string {
+  if (!name) return "IN";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "IN";
+}
+
+function MiniAvatar({ src, name }: { src: string | null; name: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={name || "author"} onError={() => setFailed(true)} className="h-8 w-8 shrink-0 rounded-full object-cover" />;
+  }
+  return (
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ecco-navy to-ecco-blue text-[10px] font-semibold text-white">
+      {initials(name)}
     </div>
   );
 }

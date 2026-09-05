@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Search, Loader2, Trash2, X, Star, Heart, MessageCircle, Repeat2, TrendingUp, Users, ExternalLink, Copy, Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/lib/supabase/types";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { toast } from "sonner";
 
 type PopularPost = Database["public"]["Tables"]["popular_posts"]["Row"];
@@ -33,6 +34,7 @@ export function AdminResearchPanel() {
   const [searching, setSearching] = useState(false);
   const [tagging, setTagging] = useState(false);
   const [pool, setPool] = useState<PopularPost[]>([]);
+  const [catFilter, setCatFilter] = useState("all");
   const [selPosts, setSelPosts] = useState<Set<string>>(new Set());
   const [selProspects, setSelProspects] = useState<Set<string>>(new Set());
 
@@ -203,7 +205,15 @@ export function AdminResearchPanel() {
   };
 
   const featured = pool.filter((p) => p.featured);
-  const allPoolSelected = pool.length > 0 && pool.every((p) => selPosts.has(p.id));
+  const categories = useMemo(
+    () => Array.from(new Set(pool.map((p) => p.archetype || p.vertical).filter(Boolean))).sort() as string[],
+    [pool]
+  );
+  const shownPool = useMemo(
+    () => (catFilter === "all" ? pool : pool.filter((p) => (p.archetype || p.vertical) === catFilter)),
+    [pool, catFilter]
+  );
+  const allPoolSelected = shownPool.length > 0 && shownPool.every((p) => selPosts.has(p.id));
   const allProspectsSelected = prospects.length > 0 && prospects.every((p) => selProspects.has(p.id));
   const tabTrigger = "data-[state=active]:!bg-ecco-navy data-[state=active]:!text-white text-ecco-tertiary px-4 py-2";
 
@@ -250,6 +260,16 @@ export function AdminResearchPanel() {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-ecco-primary">Research pool {pool.length > 0 && `(${featured.length} shared)`}</p>
                 <div className="flex items-center gap-2">
+                  {categories.length > 0 && (
+                    <select
+                      value={catFilter}
+                      onChange={(e) => setCatFilter(e.target.value)}
+                      className="rounded-lg border border-ecco bg-white px-3 py-1.5 text-sm text-ecco-primary"
+                    >
+                      <option value="all">All categories</option>
+                      {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    </select>
+                  )}
                   {selPosts.size > 0 && (
                     <Button size="sm" variant="outline" className="border-ecco-error text-ecco-error hover:bg-red-50" onClick={bulkDeletePosts}>
                       <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete {selPosts.size}
@@ -264,14 +284,15 @@ export function AdminResearchPanel() {
                 </div>
               </div>
               {pool.length === 0 && <p className="text-sm text-ecco-muted">Nothing yet. Run a search to pull posts.</p>}
-              {pool.length > 0 && (
+              {pool.length > 0 && shownPool.length === 0 && <p className="text-sm text-ecco-muted">No posts in this category.</p>}
+              {shownPool.length > 0 && (
                 <label className="flex items-center gap-2 text-xs text-ecco-tertiary">
-                  <input type="checkbox" checked={allPoolSelected} onChange={() => setSelPosts(allPoolSelected ? new Set() : new Set(pool.map((p) => p.id)))} className="h-3.5 w-3.5" />
-                  Select all ({pool.length})
+                  <input type="checkbox" checked={allPoolSelected} onChange={() => setSelPosts(allPoolSelected ? new Set() : new Set(shownPool.map((p) => p.id)))} className="h-3.5 w-3.5" />
+                  Select all ({shownPool.length}{catFilter !== "all" ? ` in ${catFilter}` : ""})
                 </label>
               )}
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 max-h-[640px] overflow-y-auto pr-1">
-                {pool.map((p) => (
+              <div className="columns-1 gap-3 sm:columns-2 xl:columns-3 max-h-[640px] overflow-y-auto pr-1">
+                {shownPool.map((p) => (
                   <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
                 ))}
               </div>
@@ -286,7 +307,7 @@ export function AdminResearchPanel() {
           <TabsContent value="live" className="space-y-3 m-0">
             <p className="text-sm text-ecco-tertiary">These are the posts users currently see on their Popular Posts page. Unstar to pull one back into research.</p>
             {featured.length === 0 && <p className="text-sm text-ecco-muted">Nothing published yet. Star posts in the Popular Posts tab.</p>}
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 max-h-[640px] overflow-y-auto pr-1">
+            <div className="columns-1 gap-3 sm:columns-2 xl:columns-3 max-h-[640px] overflow-y-auto pr-1">
               {featured.map((p) => (
                 <PoolRow key={p.id} p={p} onToggle={toggleFeatured} onRemove={removePost} selected={selPosts.has(p.id)} onSelect={togglePost} />
               ))}
@@ -405,14 +426,14 @@ function PoolAvatar({ src, name }: { src: string | null; name: string | null }) 
 function PoolRow({ p, onToggle, onRemove, selected, onSelect }: { p: PopularPost; onToggle: (p: PopularPost) => void; onRemove: (id: string) => void; selected: boolean; onSelect: (id: string) => void }) {
   const pill = p.archetype || p.vertical;
   return (
-    <div className={`flex h-full flex-col rounded-xl border bg-white p-4 ${selected ? "border-ecco-navy ring-1 ring-ecco-navy" : p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
+    <div className={`mb-3 flex break-inside-avoid flex-col rounded-xl border bg-white p-4 ${selected ? "border-ecco-navy ring-1 ring-ecco-navy" : p.featured ? "border-ecco-accent bg-ecco-blue-pale" : "border-ecco-light"}`}>
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <input type="checkbox" checked={selected} onChange={() => onSelect(p.id)} className="h-4 w-4 shrink-0" />
           <PoolAvatar src={p.author_avatar} name={p.author_name} />
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight text-ecco-primary truncate">{p.author_name || "LinkedIn author"}</p>
+            <p className="text-sm font-semibold leading-tight text-ecco-primary break-words">{p.author_name || "LinkedIn author"}</p>
             {p.author_headline && <p className="text-[11px] leading-snug text-ecco-tertiary line-clamp-1">{p.author_headline}</p>}
           </div>
         </div>
@@ -431,7 +452,7 @@ function PoolRow({ p, onToggle, onRemove, selected, onSelect }: { p: PopularPost
       </div>
 
       {/* Body */}
-      <p className="flex-1 whitespace-pre-wrap text-sm leading-relaxed text-ecco-secondary line-clamp-6">{p.content}</p>
+      <ExpandableText text={p.content} clampClass="line-clamp-[14]" threshold={500} className="text-sm leading-relaxed text-ecco-secondary" />
 
       {/* Footer */}
       <div className="mt-3 flex items-center gap-3 border-t border-ecco-light pt-2.5 font-mono text-[11px] text-ecco-tertiary">

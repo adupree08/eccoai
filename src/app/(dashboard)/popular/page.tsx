@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePopularPosts } from "@/hooks/use-popular-posts";
 import { ExternalLink, Copy, Check, TrendingUp, Loader2 } from "lucide-react";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { toast } from "sonner";
 
 function compact(n: number): string {
@@ -132,20 +133,20 @@ export default function PopularPostsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="columns-1 gap-5 md:columns-2 xl:columns-3">
           {shown.map((p) => {
             const pill = p.archetype || p.vertical;
             return (
               <article
                 key={p.id}
-                className="group relative flex h-full flex-col rounded-[20px] border border-ecco bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                className="group relative mb-5 flex break-inside-avoid flex-col rounded-[20px] border border-ecco bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
               >
                 {/* Header */}
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <Avatar src={p.author_avatar} name={p.author_name} />
                     <div className="min-w-0">
-                      <p className="text-base font-bold leading-tight text-ecco-primary line-clamp-1">
+                      <p className="text-base font-bold leading-tight text-ecco-primary break-words">
                         {p.author_name || "LinkedIn author"}
                       </p>
                       {p.author_headline && (
@@ -163,9 +164,12 @@ export default function PopularPostsPage() {
                 </div>
 
                 {/* Body */}
-                <p className="flex-1 whitespace-pre-wrap text-[15px] leading-[1.6] text-ecco-secondary line-clamp-[14]">
-                  {p.content}
-                </p>
+                <ExpandableText
+                  text={p.content}
+                  clampClass="line-clamp-[20]"
+                  threshold={600}
+                  className="text-[15px] leading-[1.6] text-ecco-secondary"
+                />
 
                 {/* Footer */}
                 <div className="mt-5 flex items-center justify-between border-t border-ecco-light pt-3.5 font-mono text-xs text-ecco-tertiary">
