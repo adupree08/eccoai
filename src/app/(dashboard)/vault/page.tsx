@@ -51,8 +51,10 @@ function TagControl({
   onSet: (v: { pillar_id: string | null; tag: string | null }) => void;
 }) {
   const pillar = pillarId ? pillars.find((p) => p.id === pillarId) : null;
+  // Tags are content pillars. `tag` is only kept as a fallback label for any
+  // legacy value; new tags are always a pillar.
   const label = pillar ? pillar.name : tag;
-  const value = pillarId ? `p:${pillarId}` : tag ? "other" : "none";
+  const value = pillarId ? `p:${pillarId}` : "none";
   return (
     <div className="flex items-center gap-1.5">
       {label && (
@@ -67,11 +69,8 @@ function TagControl({
         value={value}
         onChange={(e) => {
           const v = e.target.value;
-          if (v === "none") onSet({ pillar_id: null, tag: null });
-          else if (v === "other") {
-            const t = window.prompt("Tag label")?.trim();
-            if (t) onSet({ pillar_id: null, tag: t });
-          } else if (v.startsWith("p:")) {
+          if (v === "remove") onSet({ pillar_id: null, tag: null });
+          else if (v.startsWith("p:")) {
             const id = v.slice(2);
             const p = pillars.find((x) => x.id === id);
             onSet({ pillar_id: id, tag: p ? p.name : null });
@@ -79,10 +78,10 @@ function TagControl({
         }}
         className="rounded-md border border-ecco bg-white px-1.5 py-0.5 text-[11px] text-ecco-tertiary"
       >
-        <option value="none">{label ? "Change tag" : "+ Tag"}</option>
+        <option value="none">{label ? "Change pillar" : "+ Tag"}</option>
+        {pillars.length === 0 && <option value="none" disabled>Add pillars in Settings</option>}
         {pillars.map((p) => (<option key={p.id} value={`p:${p.id}`}>{p.name}</option>))}
-        <option value="other">Other…</option>
-        {label && <option value="none">Remove tag</option>}
+        {label && <option value="remove">Remove tag</option>}
       </select>
     </div>
   );
