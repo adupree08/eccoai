@@ -61,7 +61,8 @@ Return ONLY the post body. No preamble, no quotes, no markdown.`;
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 400,
+      max_tokens: 1024,
+      thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],
     });
 

@@ -39,7 +39,8 @@ export async function POST() {
   try {
     const msg = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 2000,
+      max_tokens: 4096,
+      thinking: { type: "disabled" },
       system:
         "You are a LinkedIn content strategist. You extract reusable POST STRUCTURES (hook pattern, body shape, closing move) from high-performing posts. You never copy content, only the structural pattern.",
       messages: [

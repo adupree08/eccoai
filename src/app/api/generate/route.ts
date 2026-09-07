@@ -292,7 +292,8 @@ IMPORTANT: Return your response as valid JSON in this exact format:
 
     const message = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096, // room for 2 full posts as JSON (2048 truncated mid-output)
+      thinking: { type: "disabled" }, // simple structured gen; faster + cheaper, avoids budget contention
       system: systemPromptWithPillar,
       messages: [
         { role: "user", content: userPrompt },
@@ -308,11 +309,17 @@ IMPORTANT: Return your response as valid JSON in this exact format:
     // Parse the JSON response
     let generatedPosts;
     try {
-      // Try to extract JSON from the response (Claude might wrap it in markdown code blocks)
-      let jsonStr = textContent.text;
+      // Extract JSON whether it's fenced, preceded by prose, or bare.
+      let jsonStr = textContent.text.trim();
       const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (jsonMatch) {
         jsonStr = jsonMatch[1].trim();
+      } else {
+        const first = jsonStr.indexOf("{");
+        const last = jsonStr.lastIndexOf("}");
+        if (first !== -1 && last !== -1 && last > first) {
+          jsonStr = jsonStr.slice(first, last + 1);
+        }
       }
       generatedPosts = JSON.parse(jsonStr);
     } catch {

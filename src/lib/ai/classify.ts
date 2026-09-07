@@ -35,6 +35,7 @@ export async function classifyArchetypes(contents: string[]): Promise<(string | 
     const msg = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 1024,
+      thinking: { type: "disabled" },
       system: `You label LinkedIn posts by their structural archetype. Choose EXACTLY ONE label per post from this list: ${ARCHETYPES.join(", ")}. Return ONLY a JSON array of objects like [{"i":0,"label":"Story"}], one per post, using the post's index.`,
       messages: [{ role: "user", content: numbered }],
     });
