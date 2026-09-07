@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAdminUser } from "@/lib/auth/admin";
-import { CLAUDE_MODEL } from "@/lib/ai/model";
+import { CLAUDE_MODEL_UTILITY } from "@/lib/ai/model";
 
 // Admin-only. Reads the top popular_posts and asks Claude to distill the
 // recurring, reusable post STRUCTURES (not the content). Saves them as
@@ -38,7 +38,7 @@ export async function POST() {
   let text = "";
   try {
     const msg = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
+      model: CLAUDE_MODEL_UTILITY,
       max_tokens: 4096,
       thinking: { type: "disabled" },
       system:

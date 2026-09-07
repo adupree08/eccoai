@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { checkDemoRateLimit } from "@/lib/security/rate-limit";
-import { CLAUDE_MODEL } from "@/lib/ai/model";
+import { CLAUDE_MODEL_UTILITY } from "@/lib/ai/model";
 
 const AUDIENCE_BIOS: Record<string, string> = {
   consultants:
@@ -60,7 +60,7 @@ Return ONLY the post body. No preamble, no quotes, no markdown.`;
 
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
-      model: CLAUDE_MODEL,
+      model: CLAUDE_MODEL_UTILITY,
       max_tokens: 1024,
       thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],

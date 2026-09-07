@@ -292,8 +292,9 @@ IMPORTANT: Return your response as valid JSON in this exact format:
 
     const message = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 4096, // room for 2 full posts as JSON (2048 truncated mid-output)
-      thinking: { type: "disabled" }, // simple structured gen; faster + cheaper, avoids budget contention
+      max_tokens: 8192, // headroom for adaptive thinking + 2 full posts as JSON
+      thinking: { type: "adaptive" }, // Opus 5 quality; medium effort keeps it snappy
+      output_config: { effort: "medium" },
       system: systemPromptWithPillar,
       messages: [
         { role: "user", content: userPrompt },

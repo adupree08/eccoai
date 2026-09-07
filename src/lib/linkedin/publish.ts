@@ -12,6 +12,23 @@ export async function publishPost(
   svc: SupabaseClient,
   post: PostRow
 ): Promise<{ ok: boolean; error?: string; linkedinId?: string }> {
+  // Simulation mode: exercise the full schedule -> publish -> status flow
+  // WITHOUT calling LinkedIn (no LinkedIn app or connection needed). Set
+  // LINKEDIN_SIMULATE=true in the environment to enable; remove it to go live.
+  if (process.env.LINKEDIN_SIMULATE === "true") {
+    const linkedinId = `simulated-${Date.now()}`;
+    await svc
+      .from("posts")
+      .update({
+        status: "published",
+        published_at: new Date().toISOString(),
+        linkedin_post_id: linkedinId,
+        publish_error: null,
+      })
+      .eq("id", post.id);
+    return { ok: true, linkedinId };
+  }
+
   const { data: conn } = await svc
     .from("linkedin_connections")
     .select("*")
