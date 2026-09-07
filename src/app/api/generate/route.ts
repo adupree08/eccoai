@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "@/lib/prompts/system-prompt";
+import { CLAUDE_MODEL } from "@/lib/ai/model";
 
 // Claude completions routinely run past the 10s default. Without this the
 // platform kills the function mid-generation and the user sees a parse error
@@ -290,7 +291,7 @@ IMPORTANT: Return your response as valid JSON in this exact format:
     const anthropic = getAnthropic();
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 2048,
       system: systemPromptWithPillar,
       messages: [

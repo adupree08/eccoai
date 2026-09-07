@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_MODEL } from "@/lib/ai/model";
 
 // The fixed set of post archetypes shown as the pill label on Popular Posts.
 // Keep this list small and stable so the pills stay consistent.
@@ -32,7 +33,7 @@ export async function classifyArchetypes(contents: string[]): Promise<(string | 
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 1024,
       system: `You label LinkedIn posts by their structural archetype. Choose EXACTLY ONE label per post from this list: ${ARCHETYPES.join(", ")}. Return ONLY a JSON array of objects like [{"i":0,"label":"Story"}], one per post, using the post's index.`,
       messages: [{ role: "user", content: numbered }],

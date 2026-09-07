@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAdminUser } from "@/lib/auth/admin";
+import { CLAUDE_MODEL } from "@/lib/ai/model";
 
 // Admin-only. Reads the top popular_posts and asks Claude to distill the
 // recurring, reusable post STRUCTURES (not the content). Saves them as
@@ -37,7 +38,7 @@ export async function POST() {
   let text = "";
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 2000,
       system:
         "You are a LinkedIn content strategist. You extract reusable POST STRUCTURES (hook pattern, body shape, closing move) from high-performing posts. You never copy content, only the structural pattern.",
