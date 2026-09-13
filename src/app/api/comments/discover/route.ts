@@ -51,7 +51,16 @@ export async function POST(request: Request) {
         signal: AbortSignal.timeout(40000),
       }
     );
-    if (!res.ok) return NextResponse.json({ error: "The search actor did not run. Check APIFY_TOKEN." }, { status: 502 });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      console.error("Apify post-search failed:", res.status, detail);
+      const hint = res.status === 401 || res.status === 403
+        ? "APIFY_TOKEN is missing or invalid in Vercel."
+        : /limit|quota|exceeded/i.test(detail)
+          ? "Your Apify plan's monthly usage limit is exceeded, upgrade or wait for the reset."
+          : `Apify returned ${res.status}.`;
+      return NextResponse.json({ error: `The search actor did not run. ${hint}` }, { status: 502 });
+    }
     items = (await res.json()) as Item[];
   } catch {
     return NextResponse.json({ error: "Search timed out. Try again." }, { status: 504 });
