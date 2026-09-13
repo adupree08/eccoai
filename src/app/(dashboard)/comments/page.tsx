@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useCommentQueue, type QueueItem } from "@/hooks/use-comment-queue";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { AudiencePanel } from "@/components/comments/audience-panel";
 import { Button } from "@/components/ui/button";
 import { ExpandableText } from "@/components/ui/expandable-text";
 import { MessageSquare, Search, Loader2, Copy, Check, ExternalLink, CheckCircle2, X, Trash2 } from "lucide-react";
@@ -30,21 +29,20 @@ function Avatar({ src, name }: { src: string | null; name: string | null }) {
 
 export default function CommentsPage() {
   const { items, loading, updateItem, removeItem, refetch } = useCommentQueue();
-  const [keywords, setKeywords] = useState("");
-  const [titles, setTitles] = useState("");
+  const [audienceId, setAudienceId] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [view, setView] = useState<"pending" | "done" | "skipped">("pending");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   const find = async () => {
-    if (!keywords.trim()) return toast.error("Enter topics or keywords");
+    if (!audienceId) return toast.error("Set up an audience first");
     setFinding(true);
     try {
       const res = await fetch("/api/comments/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keywords: keywords.trim(), titles: titles.trim() }),
+        body: JSON.stringify({ audienceId }),
       });
       const data = await res.json();
       if (!res.ok) toast.error(data.error || "Discovery failed");
@@ -104,22 +102,17 @@ export default function CommentsPage() {
         </p>
       </div>
 
+      {/* Audience (who + what) */}
+      <AudiencePanel selectedId={audienceId} onSelect={setAudienceId} />
+
       {/* Find posts */}
-      <Card className="border-ecco">
-        <CardContent className="space-y-3 p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input placeholder="Topics your buyers care about (e.g. cold outreach, RevOps)" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
-            <Input placeholder="Prospect titles (optional, e.g. VP Sales, Head of Growth)" value={titles} onChange={(e) => setTitles(e.target.value)} />
-          </div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-ecco-muted">Pulls recent posts, filters by who posted, and drafts a comment for each.</p>
-            <Button onClick={find} disabled={finding} className="bg-ecco-navy hover:bg-ecco-navy-light text-white">
-              {finding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-              Find posts
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-ecco-muted">Pulls this week&apos;s posts on your watch words, keeps only your customers, and drafts a comment for each.</p>
+        <Button onClick={find} disabled={finding || !audienceId} className="shrink-0 bg-ecco-navy hover:bg-ecco-navy-light text-white">
+          {finding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+          Find posts
+        </Button>
+      </div>
 
       {/* Queue */}
       <div className="flex items-center gap-2">

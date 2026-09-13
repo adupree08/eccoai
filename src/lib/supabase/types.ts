@@ -408,6 +408,47 @@ export interface Database {
           updated_at?: string;
         };
       };
+      audiences: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          description: string | null;
+          watch_words: string[];
+          skip_words: string[];
+          titles: string[];
+          industries: string[];
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          description?: string | null;
+          watch_words?: string[];
+          skip_words?: string[];
+          titles?: string[];
+          industries?: string[];
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          description?: string | null;
+          watch_words?: string[];
+          skip_words?: string[];
+          titles?: string[];
+          industries?: string[];
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       comment_queue: {
         Row: {
           id: string;
@@ -420,6 +461,7 @@ export interface Database {
           draft_comment: string | null;
           topic: string | null;
           status: "pending" | "done" | "skipped";
+          audience_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -434,6 +476,7 @@ export interface Database {
           draft_comment?: string | null;
           topic?: string | null;
           status?: "pending" | "done" | "skipped";
+          audience_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -448,6 +491,7 @@ export interface Database {
           draft_comment?: string | null;
           topic?: string | null;
           status?: "pending" | "done" | "skipped";
+          audience_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -32,14 +32,35 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const keywords: string = typeof body?.keywords === "string" ? body.keywords.trim() : "";
-  const titlesRaw: string = typeof body?.titles === "string" ? body.titles.trim() : "";
   const maxPosts = Math.min(Math.max(Number(body?.maxPosts) || 10, 1), 15);
-  if (!keywords) return NextResponse.json({ error: "Enter topics or keywords." }, { status: 400 });
 
-  const titleTerms = titlesRaw ? titlesRaw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) : [];
+  // Targeting comes from a saved audience (who + what). Falls back to ad-hoc
+  // keywords/titles so the old inline form still works.
+  const audienceId: string | null = typeof body?.audienceId === "string" ? body.audienceId : null;
+  let watchWords: string[] = [];
+  let skipWords: string[] = [];
+  let titleTerms: string[] = [];
+  let industryTerms: string[] = [];
+  let topicLabel = "";
 
-  // 1. Pull recent posts for the keywords.
+  if (audienceId) {
+    const { data: aud } = await supabase.from("audiences").select("*").eq("id", audienceId).eq("user_id", user.id).maybeSingle();
+    if (!aud) return NextResponse.json({ error: "Audience not found." }, { status: 404 });
+    watchWords = (aud.watch_words || []).map((w: string) => w.trim()).filter(Boolean);
+    skipWords = (aud.skip_words || []).map((w: string) => w.trim().toLowerCase()).filter(Boolean);
+    titleTerms = (aud.titles || []).map((t: string) => t.trim().toLowerCase()).filter(Boolean);
+    industryTerms = (aud.industries || []).map((t: string) => t.trim().toLowerCase()).filter(Boolean);
+    topicLabel = aud.name;
+  } else {
+    const keywords: string = typeof body?.keywords === "string" ? body.keywords.trim() : "";
+    const titlesRaw: string = typeof body?.titles === "string" ? body.titles.trim() : "";
+    watchWords = keywords ? [keywords] : [];
+    titleTerms = titlesRaw ? titlesRaw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) : [];
+    topicLabel = keywords;
+  }
+  if (watchWords.length === 0) return NextResponse.json({ error: "Add at least one topic to watch for." }, { status: 400 });
+
+  // 1. Pull recent posts for every watch word in one actor run.
   let items: Item[] = [];
   try {
     const res = await fetch(
@@ -47,8 +68,8 @@ export async function POST(request: Request) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ searchQueries: [keywords], maxPosts: 25, sortBy: "date", postedLimit: "week" }),
-        signal: AbortSignal.timeout(40000),
+        body: JSON.stringify({ searchQueries: watchWords.slice(0, 10), maxPosts: 40, sortBy: "date", postedLimit: "week" }),
+        signal: AbortSignal.timeout(45000),
       }
     );
     if (!res.ok) {
@@ -81,7 +102,15 @@ export async function POST(request: Request) {
       };
     })
     .filter((r) => r.post_content && r.post_url)
-    .filter((r) => titleTerms.length === 0 || (r.author_headline && titleTerms.some((t) => r.author_headline!.toLowerCase().includes(t))));
+    // WHAT: drop posts that mention a skip word.
+    .filter((r) => skipWords.length === 0 || !skipWords.some((w) => r.post_content!.toLowerCase().includes(w)))
+    // WHO: author headline must match a customer title or industry, if any are set.
+    .filter((r) => {
+      const who = [...titleTerms, ...industryTerms];
+      if (who.length === 0) return true;
+      const h = (r.author_headline || "").toLowerCase();
+      return who.some((t) => h.includes(t));
+    });
 
   if (mapped.length === 0) {
     return NextResponse.json({ success: true, added: 0, note: "No matching posts found. Try broader topics or fewer title filters." });
@@ -156,7 +185,8 @@ export async function POST(request: Request) {
     post_url: r.post_url,
     post_content: r.post_content,
     draft_comment: comments[i] || null,
-    topic: keywords,
+    topic: topicLabel,
+    audience_id: audienceId,
     status: "pending" as const,
   }));
 
