@@ -19,6 +19,7 @@ import {
   Shield,
   TrendingUp,
   Lightbulb,
+  MessageSquare,
 } from "lucide-react";
 
 // Admin email whitelist
@@ -59,6 +60,11 @@ const navItems = [
     name: "Idea Vault",
     href: "/vault",
     icon: Lightbulb,
+  },
+  {
+    name: "Comments",
+    href: "/comments",
+    icon: MessageSquare,
   },
   {
     name: "Calendar",

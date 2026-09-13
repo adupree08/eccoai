@@ -408,6 +408,50 @@ export interface Database {
           updated_at?: string;
         };
       };
+      comment_queue: {
+        Row: {
+          id: string;
+          user_id: string;
+          author_name: string | null;
+          author_headline: string | null;
+          author_avatar: string | null;
+          post_url: string | null;
+          post_content: string | null;
+          draft_comment: string | null;
+          topic: string | null;
+          status: "pending" | "done" | "skipped";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          author_name?: string | null;
+          author_headline?: string | null;
+          author_avatar?: string | null;
+          post_url?: string | null;
+          post_content?: string | null;
+          draft_comment?: string | null;
+          topic?: string | null;
+          status?: "pending" | "done" | "skipped";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          author_name?: string | null;
+          author_headline?: string | null;
+          author_avatar?: string | null;
+          post_url?: string | null;
+          post_content?: string | null;
+          draft_comment?: string | null;
+          topic?: string | null;
+          status?: "pending" | "done" | "skipped";
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       linkedin_connections: {
         Row: {
           user_id: string;
