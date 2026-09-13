@@ -54,10 +54,10 @@ export async function POST(request: Request) {
     if (!res.ok) {
       const detail = (await res.text().catch(() => "")).slice(0, 300);
       console.error("Apify post-search failed:", res.status, detail);
-      const hint = res.status === 401 || res.status === 403
-        ? "APIFY_TOKEN is missing or invalid in Vercel."
-        : /limit|quota|exceeded/i.test(detail)
-          ? "Your Apify plan's monthly usage limit is exceeded, upgrade or wait for the reset."
+      const hint = /limit|quota|exceeded|feature-disabled/i.test(detail)
+        ? "Your Apify account's monthly usage limit is exceeded. Upgrade your Apify plan or wait for the monthly reset."
+        : res.status === 401
+          ? "APIFY_TOKEN is missing or invalid in Vercel."
           : `Apify returned ${res.status}.`;
       return NextResponse.json({ error: `The search actor did not run. ${hint}` }, { status: 502 });
     }
