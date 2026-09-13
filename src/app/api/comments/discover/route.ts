@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       max_tokens: 4096,
       thinking: { type: "adaptive" },
       output_config: { effort: "low" },
-      system: `You write thoughtful LinkedIn comments that add genuine value to someone else's post. Each comment is 1-2 sentences, specific to the post, never generic ("Great post!"), never salesy. You are commenting to build a relationship with a potential customer.${voiceBlock}\n\nReturn ONLY a JSON array like [{"i":0,"comment":"..."}], one per post index.`,
+      system: `You write thoughtful LinkedIn comments that add genuine value to someone else's post. Each comment is 1-2 sentences, specific to the post, never generic ("Great post!"), never salesy. You are commenting to build a relationship with a potential customer.\n\nNEVER use em dashes (—) or en dashes (–). This is a strict rule with zero exceptions. Use commas, periods, or parentheses instead, or rewrite the sentence.${voiceBlock}\n\nReturn ONLY a JSON array like [{"i":0,"comment":"..."}], one per post index.`,
       messages: [{ role: "user", content: numbered }],
     });
     const text = msg.content.find((b) => b.type === "text");
