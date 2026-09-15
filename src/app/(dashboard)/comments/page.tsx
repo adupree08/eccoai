@@ -5,7 +5,7 @@ import { useCommentQueue, type QueueItem } from "@/hooks/use-comment-queue";
 import { AudiencePanel } from "@/components/comments/audience-panel";
 import { Button } from "@/components/ui/button";
 import { ExpandableText } from "@/components/ui/expandable-text";
-import { MessageSquare, Search, Loader2, Copy, Check, ExternalLink, CheckCircle2, X, Trash2 } from "lucide-react";
+import { MessageSquare, Search, Loader2, Copy, Check, ExternalLink, CheckCircle2, X, Trash2, RefreshCw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 function initials(name: string | null): string {
@@ -34,6 +34,30 @@ export default function CommentsPage() {
   const [view, setView] = useState<"pending" | "done" | "skipped">("pending");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [reviseText, setReviseText] = useState<Record<string, string>>({});
+  const [revisingId, setRevisingId] = useState<string | null>(null);
+
+  // Regenerate (no instruction) or revise (with instruction) one comment.
+  const revise = async (item: QueueItem, instruction = "") => {
+    setRevisingId(item.id);
+    try {
+      const res = await fetch("/api/comments/revise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, instruction, currentDraft: drafts[item.id] ?? item.draft_comment ?? "" }),
+      });
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.error || "Could not revise");
+      setDrafts((d) => ({ ...d, [item.id]: data.comment }));
+      await updateItem(item.id, { draft_comment: data.comment });
+      setReviseText((t) => ({ ...t, [item.id]: "" }));
+      toast.success(instruction ? "Comment revised" : "New comment drafted");
+    } catch {
+      toast.error("Could not revise");
+    } finally {
+      setRevisingId(null);
+    }
+  };
 
   const find = async () => {
     if (!audienceId) return toast.error("Set up an audience first");
@@ -151,6 +175,43 @@ export default function CommentsPage() {
                   placeholder="No draft yet. Write your comment here."
                   className="min-h-[64px] w-full resize-none rounded-md border border-ecco bg-white px-2.5 py-2 text-sm text-ecco-primary"
                 />
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={() => revise(item)}
+                    disabled={revisingId === item.id}
+                    className="inline-flex items-center gap-1 rounded-md border border-ecco bg-white px-2 py-1 text-[11px] font-medium text-ecco-secondary hover:bg-ecco-off-white disabled:opacity-60"
+                    title="Draft a fresh comment with a different angle"
+                  >
+                    {revisingId === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    Regenerate
+                  </button>
+                  {["Shorter", "Add a question", "More direct", "Warmer"].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => revise(item, q)}
+                      disabled={revisingId === item.id}
+                      className="rounded-md border border-ecco bg-white px-2 py-1 text-[11px] text-ecco-tertiary hover:bg-ecco-off-white disabled:opacity-60"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    value={reviseText[item.id] ?? ""}
+                    onChange={(e) => setReviseText((t) => ({ ...t, [item.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter" && (reviseText[item.id] ?? "").trim()) revise(item, reviseText[item.id]); }}
+                    placeholder="Ask for a change, e.g. mention my clinic, cut the second sentence"
+                    className="min-w-0 flex-1 rounded-md border border-ecco bg-white px-2 py-1 text-[11px] text-ecco-primary"
+                  />
+                  <button
+                    onClick={() => revise(item, reviseText[item.id])}
+                    disabled={revisingId === item.id || !(reviseText[item.id] ?? "").trim()}
+                    className="inline-flex items-center gap-1 rounded-md bg-ecco-navy px-2 py-1 text-[11px] font-semibold text-white hover:bg-ecco-navy-light disabled:opacity-50"
+                  >
+                    <Wand2 className="h-3 w-3" /> Revise
+                  </button>
+                </div>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ecco-light pt-3">
