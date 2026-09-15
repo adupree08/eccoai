@@ -59,7 +59,7 @@ function Avatar({ src, name }: { src: string | null; name: string | null }) {
 
 export default function PopularPostsPage() {
   const { popular, loading } = usePopularPosts(200);
-  const { saveResearchPost } = useIdeas();
+  const { ideas, saveResearchPost } = useIdeas();
   const router = useRouter();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -103,8 +103,15 @@ export default function PopularPostsPage() {
   const types = useMemo(() => Array.from(new Set(popular.map((p) => p.archetype).filter(Boolean))) as string[], [popular]);
   const topics = useMemo(() => Array.from(new Set(popular.map((p) => p.vertical).filter(Boolean))) as string[], [popular]);
 
+  // Posts already saved to the vault leave this feed. They live on in the
+  // vault's Saved Posts tab (the archive), so nothing is lost.
+  const savedPostIds = useMemo(
+    () => new Set(ideas.filter((i) => i.source === "research" && i.source_popular_post_id).map((i) => i.source_popular_post_id as string)),
+    [ideas]
+  );
+
   const shown = useMemo(() => {
-    let list = popular.slice();
+    let list = popular.filter((p) => !savedPostIds.has(p.id));
     if (type !== "all") list = list.filter((p) => p.archetype === type);
     if (topic !== "all") list = list.filter((p) => p.vertical === topic);
     list.sort((a, b) =>
@@ -113,7 +120,7 @@ export default function PopularPostsPage() {
         : b.likes - a.likes
     );
     return list;
-  }, [popular, type, topic, sort]);
+  }, [popular, savedPostIds, type, topic, sort]);
 
   const selectCls = "rounded-lg border border-ecco bg-white px-3 py-2 text-sm text-ecco-primary";
 
@@ -143,7 +150,12 @@ export default function PopularPostsPage() {
             <option value="popular">Most popular</option>
             <option value="recent">Most recent</option>
           </select>
-          <span className="ml-auto text-sm text-ecco-tertiary">{shown.length} post{shown.length === 1 ? "" : "s"}</span>
+          <span className="ml-auto text-sm text-ecco-tertiary">
+            {shown.length} post{shown.length === 1 ? "" : "s"}
+            {savedPostIds.size > 0 && (
+              <> · <a href="/vault" className="text-ecco-accent hover:underline">{savedPostIds.size} saved in vault</a></>
+            )}
+          </span>
         </div>
       )}
 
@@ -157,6 +169,20 @@ export default function PopularPostsPage() {
             <TrendingUp className="h-8 w-8 text-ecco-muted" />
             <p className="text-sm font-medium text-ecco-primary">No popular posts yet</p>
             <p className="text-sm text-ecco-tertiary">Check back soon. Fresh examples are added regularly.</p>
+          </CardContent>
+        </Card>
+      ) : shown.length === 0 ? (
+        <Card className="border-ecco">
+          <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+            <Bookmark className="h-8 w-8 text-ecco-muted" />
+            <p className="text-sm font-medium text-ecco-primary">
+              {savedPostIds.size > 0 ? "You've saved everything here" : "No posts match these filters"}
+            </p>
+            <p className="text-sm text-ecco-tertiary">
+              {savedPostIds.size > 0 ? (
+                <>Saved posts live in your <a href="/vault" className="text-ecco-accent hover:underline">Idea Vault</a>. New picks show up here as they're added.</>
+              ) : "Try a different type or topic."}
+            </p>
           </CardContent>
         </Card>
       ) : (
