@@ -72,7 +72,9 @@ export async function POST(request: Request) {
     resolveSample = prof[0] ?? null;
     for (const p of prof) {
       const q = obj(p.query);
-      const cands = [str(p.id), str(p.profileId), str(p.urn), str(q.profileId), str(q.query), str(q.url)].filter(Boolean) as string[];
+      const oq = p.originalQuery;
+      const oqStr = typeof oq === "string" ? oq : JSON.stringify(oq ?? "");
+      const cands = [oqStr, str(p.id), str(p.profileId), str(p.urn), str(q.profileId), str(q.query), str(q.url)].filter(Boolean) as string[];
       const idx = targets.findIndex((t) => !t.target && cands.some((c) => c.includes(t.input.match(URN_RE)![1])));
       const slug = str(p.publicIdentifier);
       const link = str(p.linkedinUrl);
